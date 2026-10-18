@@ -3,6 +3,16 @@ const form = document.getElementById('chart-form');
 const error = document.getElementById('error');
 const result = document.getElementById('result');
 const calendarType = document.getElementById('calendar-type');
+const simpleButton = document.getElementById('view-simple');
+const detailButton = document.getElementById('view-detail');
+function setView(detail) {
+  document.getElementById('pillars').hidden = detail;
+  document.getElementById('traditional').hidden = !detail;
+  simpleButton.setAttribute('aria-pressed', String(!detail));
+  detailButton.setAttribute('aria-pressed', String(detail));
+}
+simpleButton.addEventListener('click', () => setView(false));
+detailButton.addEventListener('click', () => setView(true));
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
 
 function number(id) { return Number(document.getElementById(id).value); }
@@ -43,7 +53,11 @@ function calculate() {
     name: names[i],
     ganzhi: eight[`get${key}`](),
     nayin: eight[`get${key}NaYin`](),
-    shishen: key === 'Day' ? '日主' : eight[`get${key}ShiShenGan`]()
+    shishen: key === 'Day' ? '日主' : eight[`get${key}ShiShenGan`](),
+    hiddenStems: eight[`get${key}HideGan`](),
+    hiddenGods: eight[`get${key}ShiShenZhi`](),
+    stage: eight[`get${key}DiShi`](),
+    empty: eight[`get${key}XunKong`]()
   }));
   const lunar = solar.getLunar();
   const yun = eight.getYun(number('gender'));
@@ -62,6 +76,28 @@ function render(data) {
     const ganzhi = document.createElement('div'); ganzhi.className = 'ganzhi'; ganzhi.textContent = safeText(pillar.ganzhi);
     const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${safeText(pillar.shishen)} · ${safeText(pillar.nayin)}`;
     card.append(label, ganzhi, meta); pillarContainer.append(card);
+  }
+  const traditionalContainer = document.getElementById('traditional');
+  traditionalContainer.replaceChildren();
+  for (const pillar of data.pillars) {
+    const card = document.createElement('article'); card.className = 'trad-card';
+    const heading = document.createElement('h3'); heading.textContent = pillar.name;
+    const value = document.createElement('strong'); value.className = 'trad-ganzhi'; value.textContent = safeText(pillar.ganzhi);
+    card.append(heading, value);
+    const rows = [
+      ['天干十神', pillar.shishen],
+      ['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')],
+      ['纳音', pillar.nayin],
+      ['长生', pillar.stage],
+      ['旬空', pillar.empty]
+    ];
+    for (const [name, valueText] of rows) {
+      const row = document.createElement('div'); row.className = 'trad-row';
+      const label = document.createElement('span'); label.textContent = name;
+      const content = document.createElement('span'); content.textContent = safeText(valueText);
+      row.append(label, content); card.append(row);
+    }
+    traditionalContainer.append(card);
   }
   document.getElementById('luck-start').textContent = `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`;
   const luckContainer = document.getElementById('luck'); luckContainer.replaceChildren();
