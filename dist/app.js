@@ -45,6 +45,34 @@ function startOffset(lunar, yun, solar) {
   const elapsed = Math.floor(Math.abs(solarMillis(jie) - solarMillis(solar)) / 720000);
   return { years: Math.floor(elapsed / 360), months: Math.floor((elapsed % 360) / 30), days: elapsed % 30 };
 }
+function firstLuckAge(offset, mode, forward) {
+  if (mode === 'year') return null;
+  if (mode === 'simple') return Math.max(1, offset.years);
+  if (mode === 'rounded') return Math.max(1, offset.years + (offset.months >= 5 ? 1 : 0));
+  return Math.max(1, offset.years + (forward ? 1 : 0));
+}
+function buildLuck(yun, solar, offset, mode) {
+  const daYun = yun.getDaYun(11);
+  if (mode === 'year') {
+    return daYun.map(item => ({
+      ganzhi: item.getGanZhi() || '运前', startAge: item.getStartAge(), startYear: item.getStartYear(),
+      years: item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() })),
+    }));
+  }
+  const firstAge = firstLuckAge(offset, mode, yun.isForward());
+  const birthYear = solar.getYear();
+  return daYun.map((item, index) => {
+    const startAge = index === 0 ? 1 : firstAge + (index - 1) * 10;
+    const startYear = birthYear + startAge - 1;
+    const yearCount = index === 0 ? Math.max(0, firstAge - 1) : 10;
+    const years = Array.from({ length: yearCount }, (_, i) => {
+      const year = startYear + i;
+      const ganzhi = Solar.fromYmdHms(year, 7, 1, 12, 0, 0).getLunar().getYearInGanZhi();
+      return { year, ganzhi };
+    });
+    return { ganzhi: item.getGanZhi() || '运前', startAge, startYear, years };
+  });
+}
 
 function calculate() {
   const y = number('year'), m = number('month'), d = number('day');
@@ -73,10 +101,8 @@ function calculate() {
   }));
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(lunar, yun, solar);
-  const luck = yun.getDaYun(11).map(item => ({
-    ganzhi: item.getGanZhi() || '运前', startAge: item.getStartAge(), startYear: item.getStartYear(),
-    years: item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() })),
-  }));
+  const yunMode = value('yun-mode');
+  const luck = buildLuck(yun, solar, offset, yunMode);
   const priorJie = lunar.getPrevJie();
   const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(priorJie.getSolar().getYear(), priorJie.getSolar().getMonth() - 1, priorJie.getSolar().getDay())) / 86400000) + 1;
   const extras = [
@@ -85,7 +111,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, offset, luck, extras, name: value('chart-name') };
+  return { solar, lunar, pillars, offset, luck, yunMode, extras, name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -134,7 +160,8 @@ function renderExtras(data) {
 }
 function renderLuck(data) {
   const section = make('section', 'luck-section');
-  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`));
+  const modeLabels = { year: '按年（原版默认）', cumulative: '按岁累加', simple: '按岁简化', rounded: '按岁舍入' };
+  section.append(heading('大运与流年'), make('p', 'luck-mode', `起运方式：${modeLabels[data.yunMode] || modeLabels.year}`), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`));
   const list = make('div', 'luck-list');
   for (const item of data.luck) {
     const card = make('details', 'luck-item');
