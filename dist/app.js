@@ -8,12 +8,14 @@ const modeOutput = document.getElementById('mode-output');
 let latestData = null;
 
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
+displayMode.addEventListener('change', () => { if (latestData) renderMode(latestData, displayMode.value); });
 document.querySelector('.mode-tabs').addEventListener('click', event => {
   const button = event.target.closest('[data-mode]');
   if (!button || !latestData) return;
   displayMode.value = button.dataset.mode;
   renderMode(latestData, button.dataset.mode);
 });
+document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, displayMode.value); });
 
 function number(id) { return Number(document.getElementById(id).value); }
 function value(id) { return document.getElementById(id).value.trim(); }
@@ -29,6 +31,7 @@ function make(tag, className, text) {
   if (text != null) node.textContent = safeText(text);
   return node;
 }
+function shown(id) { return document.getElementById(id).checked; }
 function startOffset(lunar, yun, solar) {
   const jie = yun.isForward() ? lunar.getNextJie().getSolar() : lunar.getPrevJie().getSolar();
   const elapsed = Math.floor(Math.abs(solarMillis(jie) - solarMillis(solar)) / 720000);
@@ -83,7 +86,10 @@ function renderPillarStrip(data, detailed = false) {
   for (const pillar of data.pillars) {
     const card = make('article', 'pillar-card');
     card.append(make('span', 'pillar-label', pillar.name), make('strong', 'ganzhi', pillar.ganzhi));
-    if (detailed) card.append(make('span', 'small-god', pillar.shishen), make('span', 'small-nayin', pillar.nayin));
+    if (detailed) {
+      card.append(make('span', 'small-god', pillar.shishen));
+      if (shown('show-nayin')) card.append(make('span', 'small-nayin', pillar.nayin));
+    }
     box.append(card);
   }
   return box;
@@ -95,16 +101,19 @@ function renderTraditional(data) {
   for (const pillar of data.pillars) {
     const card = make('article', 'trad-card');
     card.append(make('h3', '', pillar.name));
-    const rows = [
-      ['天干十神', pillar.shishen], ['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')],
-      ['纳音', pillar.nayin], ['长生', pillar.stage], ['旬空', pillar.empty],
-    ];
+    const rows = [['天干十神', pillar.shishen]];
+    if (shown('show-hidden')) rows.push(['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')]);
+    if (shown('show-nayin')) rows.push(['纳音', pillar.nayin]);
+    if (shown('show-stage')) rows.push(['长生', pillar.stage]);
+    if (shown('show-empty')) rows.push(['旬空', pillar.empty]);
     for (const [label, content] of rows) {
       const row = make('div', 'trad-row'); row.append(make('span', '', label), make('span', '', content)); card.append(row);
     }
     table.append(card);
   }
-  fragment.append(table, renderExtras(data), renderLuck(data));
+  fragment.append(table);
+  if (shown('show-extras')) fragment.append(renderExtras(data));
+  fragment.append(renderLuck(data));
   return fragment;
 }
 function renderExtras(data) {
@@ -145,10 +154,11 @@ function renderFullscreen(data) {
 function renderAnalysis(data) {
   const fragment = document.createDocumentFragment();
   const insight = make('section', 'analysis-summary');
-  insight.append(heading('分析摘要'), make('p', '', `日主为${data.pillars[2].ganzhi.slice(0, 1)}，四柱为 ${data.pillars.map(p => p.ganzhi).join(' ')}。`));
+  insight.append(heading('命盘信息'), make('p', '', `日主：${data.pillars[2].ganzhi.slice(0, 1)} · 四柱：${data.pillars.map(p => p.ganzhi).join(' ')}`));
   const tags = make('div', 'analysis-tags');
-  for (const [label, content] of data.extras) tags.append(make('span', '', `${label}：${content}`));
-  insight.append(tags); fragment.append(insight, renderTraditional(data)); return fragment;
+  if (shown('show-extras')) for (const [label, content] of data.extras) tags.append(make('span', '', `${label}：${content}`));
+  if (tags.childElementCount) insight.append(tags);
+  fragment.append(insight, renderTraditional(data)); return fragment;
 }
 function renderMode(data, mode) {
   modeOutput.replaceChildren();

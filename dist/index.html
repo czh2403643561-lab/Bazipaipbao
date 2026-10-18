@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#17252b">
+  <meta name="theme-color" content="#8d2a23">
   <meta name="description" content="个人学习用八字排盘工具预览版">
   <title>八字排盘 · 学习工具</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -14,7 +14,7 @@
     <header class="hero">
       <span class="eyebrow">个人学习工具 · 本地计算</span>
       <h1>八字排盘</h1>
-      <p>按原版的输入逻辑填写出生资料，在手机上查看四种排盘样式。</p>
+      <p>按原版的输入逻辑填写出生资料，在手机上查看四种八字排盘样式。</p>
     </header>
 
     <section class="panel" aria-labelledby="input-title">
@@ -39,13 +39,14 @@
           <label class="field"><span>分</span><input id="minute" type="number" min="0" max="59" placeholder="30" required></label>
         </div>
         <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原软件默认）</option><option value="24">24:00 换日（待核对）</option></select></label>
-        <div class="option-grid" aria-label="高级排盘选项">
-          <label class="check"><input id="early-zi" type="checkbox"><span>早晚子</span></label>
-          <label class="check"><input id="unknown-time" type="checkbox"><span>时辰不确定</span></label>
-          <label class="check"><input id="dst" type="checkbox"><span>夏令时</span></label>
-          <label class="check"><input id="true-solar" type="checkbox"><span>真太阳时</span></label>
+        <div class="option-grid unavailable" aria-label="待校验的高级排盘选项" aria-disabled="true">
+          <label class="check"><input type="checkbox" disabled><span>早晚子</span></label>
+          <label class="check"><input type="checkbox" disabled><span>时辰不确定</span></label>
+          <label class="check"><input type="checkbox" disabled><span>夏令时</span></label>
+          <label class="check"><input type="checkbox" disabled><span>真太阳时</span></label>
         </div>
-        <p class="option-note">真太阳时需要经纬度；当前先保留原版入口，尚未参与计算。</p>
+        <p class="option-note">这些原版选项仍在逐项对照，暂不参与计算，避免产生看似有效的错误结果。</p>
+        <details class="other-layouts"><summary>其他版面</summary><p>当前仅开放八字。奇门、紫微等版面保留为空入口，暂不提供内容。</p></details>
         <label class="field"><span>显示模式</span><select id="display-mode"><option value="traditional">传统</option><option value="fullscreen">全屏</option><option value="simple">精简</option><option value="analysis">分析</option></select></label>
         <button class="primary" type="submit">排盘</button>
         <p id="error" class="error" role="alert" hidden></p>
@@ -57,8 +58,18 @@
       <div class="mode-tabs" aria-label="排盘显示方式">
         <button data-mode="traditional" type="button">传统</button><button data-mode="fullscreen" type="button">全屏</button><button data-mode="simple" type="button">精简</button><button data-mode="analysis" type="button">分析</button>
       </div>
+      <details class="display-settings" open>
+        <summary>显示设置</summary>
+        <div class="option-grid">
+          <label class="check"><input id="show-hidden" type="checkbox" checked><span>显示藏干</span></label>
+          <label class="check"><input id="show-nayin" type="checkbox" checked><span>显示纳音</span></label>
+          <label class="check"><input id="show-stage" type="checkbox" checked><span>显示长生</span></label>
+          <label class="check"><input id="show-empty" type="checkbox" checked><span>显示空亡</span></label>
+          <label class="check"><input id="show-extras" type="checkbox" checked><span>显示胎元、命身宫</span></label>
+        </div>
+      </details>
       <div id="mode-output"></div>
-      <p class="note">四柱、大运、流年按开源历法本地计算；真太阳时、神煞和部分设置仍在逐项对照原版。</p>
+      <p class="note">四柱、大运、流年按开源历法在本机计算；真太阳时、神煞和高级规则仍在按原版逐项核对。</p>
     </section>
 
     <footer>数据只保留在当前页面，不上传出生信息。</footer>
