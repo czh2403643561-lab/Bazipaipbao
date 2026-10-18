@@ -152,9 +152,8 @@ function renderPillarStrip(data, detailed = false) {
 }
 function renderTraditional(data) {
   const fragment = document.createDocumentFragment();
-  fragment.append(make('p', 'swipe-hint', '四柱逐列对照 · 横向滑动查看'));
   const viewport = make('div', 'matrix-scroll');
-  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '四柱数据表，可横向滑动'); viewport.tabIndex = 0;
+  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '四柱数据表');
   const table = make('table', 'pillar-matrix');
   const head = make('thead');
   const headRow = make('tr');
@@ -199,17 +198,23 @@ function renderExtras(data) {
 function renderLuck(data) {
   const section = make('section', 'luck-section');
   const modeLabels = { year: '按年（原版默认）', cumulative: '按岁累加', simple: '按岁简化', rounded: '按岁舍入' };
-  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运 · ${modeLabels[data.yunMode] || modeLabels.year}`), make('p', 'swipe-hint', '每列一组大运，下面是对应流年 · 横向滑动查看'));
+  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运 · ${modeLabels[data.yunMode] || modeLabels.year}`));
   const list = make('div', 'luck-list');
+  list.style.gridTemplateColumns = `repeat(${data.luck.length}, minmax(0, 1fr))`;
   for (const item of data.luck) {
-    const card = make('article', 'luck-item');
+    const card = make('article', 'luck-item'); card.setAttribute('role', 'listitem');
     const header = make('header', 'luck-head');
-    header.append(make('span', 'luck-label', item.ganzhi === '运前' ? '交运前' : '大运'), make('strong', '', item.ganzhi), make('span', 'luck-start-age', `${item.startAge} 岁起 · ${item.startYear} 年`)); card.append(header);
+    header.append(make('span', 'luck-label', item.ganzhi === '运前' ? '交运前' : '大运'), make('strong', '', item.ganzhi), make('span', 'luck-start-age', `${item.startAge}岁起`), make('span', 'luck-start-year', String(item.startYear))); card.append(header);
     const years = make('div', 'annual-list');
-    for (const year of item.years) years.append(make('div', 'annual-year', `${year.year}  ${year.ganzhi}`));
+    for (const year of item.years) {
+      const row = make('div', 'annual-year');
+      row.append(make('span', '', String(year.year)), make('strong', '', year.ganzhi));
+      years.append(row);
+    }
     card.append(years); list.append(card);
   }
-  const scroller = make('div', 'luck-scroll'); scroller.setAttribute('role', 'region'); scroller.setAttribute('aria-label', '大运与流年，可横向滑动'); scroller.tabIndex = 0; scroller.append(list); section.append(scroller); return section;
+  list.setAttribute('role', 'list');
+  section.append(list); return section;
 }
 function renderSimple(data) {
   const fragment = document.createDocumentFragment();

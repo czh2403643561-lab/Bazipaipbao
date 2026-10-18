@@ -59,31 +59,31 @@ input:focus, select:focus { outline: 2px solid #bd8b64; outline-offset: 1px; }
 .small-nayin { color: var(--muted); }
 .detailed-strip { margin-bottom: 13px; }
 .swipe-hint { font-size: 11px; color: var(--muted); margin: 0 0 8px; }
-.matrix-scroll { overflow-x: auto; overscroll-behavior-inline: contain; border: 1px solid var(--line); border-radius: 9px; scrollbar-color: #bbae9d #f3f0e9; }
-.pillar-matrix { width: 100%; min-width: 396px; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12px; }
-.pillar-matrix th, .pillar-matrix td { padding: 9px 7px; border-right: 1px solid #e8e2d8; border-bottom: 1px solid #e8e2d8; text-align: center; vertical-align: top; line-height: 1.55; overflow-wrap: anywhere; }
+.matrix-scroll { overflow: visible; border: 1px solid var(--line); border-radius: 7px; }
+.pillar-matrix { width: 100%; min-width: 0; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12px; }
+.pillar-matrix th, .pillar-matrix td { padding: 6px 4px; border-right: 1px solid #e8e2d8; border-bottom: 1px solid #e8e2d8; text-align: center; vertical-align: top; line-height: 1.4; overflow-wrap: anywhere; }
 .pillar-matrix tr:last-child > * { border-bottom: 0; }
 .pillar-matrix tr > *:last-child { border-right: 0; }
-.pillar-matrix thead th { position: sticky; top: 0; z-index: 2; background: #f3eee4; color: var(--accent-dark); font-weight: 750; }
-.pillar-matrix .row-label { position: sticky; left: 0; z-index: 1; width: 52px; background: #f7f4ed; color: var(--muted); font-weight: 650; }
-.pillar-matrix thead .row-label { z-index: 3; }
-.pillar-matrix .stem-value, .pillar-matrix .branch-value { font: 700 22px/1.25 "Songti SC", "Noto Serif CJK SC", serif; color: var(--accent-dark); }
+.pillar-matrix thead th { background: #f3eee4; color: var(--accent-dark); font-weight: 750; }
+.pillar-matrix .row-label { width: 44px; background: #f7f4ed; color: var(--muted); font-weight: 650; }
+.pillar-matrix .stem-value, .pillar-matrix .branch-value { font: 700 22px/1.2 "Songti SC", "Noto Serif CJK SC", serif; color: var(--accent-dark); }
 .pillar-matrix .branch-value { color: var(--jade); }
 .pillar-matrix .sha-value { text-align: left; font-size: 11px; color: #6d392d; }
 .block-title { font-size: 15px; margin: 22px 0 9px; border-left: 3px solid var(--accent); padding-left: 9px; }
-.traditional-extra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-.extra-item { padding: 10px; border-radius: 8px; background: #f6f2e9; display: flex; flex-direction: column; gap: 4px; }
-.extra-item span { font-size: 11px; color: var(--muted); }
-.extra-item strong { font-size: 13px; font-weight: 650; }
-.luck-start { font-size: 12px; color: var(--muted); margin: 0 0 7px; }
-.luck-scroll { overflow-x: auto; overscroll-behavior-inline: contain; padding-bottom: 5px; scrollbar-color: #bbae9d #f3f0e9; }
-.luck-list { display: flex; align-items: stretch; gap: 8px; width: max-content; }
-.luck-item { flex: 0 0 112px; border: 1px solid #dcd3c5; border-radius: 8px; background: #fff; overflow: hidden; scroll-snap-align: start; }
-.luck-head { min-height: 81px; padding: 9px 7px 7px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: #f5f0e6; border-bottom: 1px solid #e4ddd1; text-align: center; }
-.luck-label, .luck-start-age { color: var(--muted); font-size: 10px; }
-.luck-head strong { color: var(--accent-dark); font: 700 22px/1.2 "Songti SC", "Noto Serif CJK SC", serif; }
-.annual-list { padding: 5px 8px 7px; }
-.annual-year { border-bottom: 1px solid #eee9e1; padding: 4px 0; text-align: center; font-size: 11px; line-height: 1.35; white-space: nowrap; }
+.traditional-extra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.extra-item { padding: 5px 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 5px; min-width: 0; }
+.extra-item span { font-size: 10px; color: var(--muted); flex: 0 0 auto; }
+.extra-item strong { font-size: 11px; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
+.luck-start { font-size: 11px; color: var(--muted); margin: 0 0 5px; }
+.luck-list { display: grid; grid-template-columns: repeat(11, minmax(0, 1fr)); align-items: stretch; border-top: 1px solid #dcd3c5; border-left: 1px solid #dcd3c5; }
+.luck-item { min-width: 0; border-right: 1px solid #dcd3c5; border-bottom: 1px solid #dcd3c5; background: #fff; overflow: hidden; }
+.luck-head { min-height: 62px; padding: 4px 1px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: #f5f0e6; border-bottom: 1px solid #e4ddd1; text-align: center; }
+.luck-label, .luck-start-age, .luck-start-year { color: var(--muted); font-size: 8px; line-height: 1.2; }
+.luck-head strong { color: var(--accent-dark); font: 700 14px/1.15 "Songti SC", "Noto Serif CJK SC", serif; white-space: nowrap; }
+.annual-list { padding: 2px 1px; }
+.annual-year { min-height: 29px; border-bottom: 1px solid #eee9e1; padding: 2px 0 1px; text-align: center; font-size: 8px; line-height: 1.2; }
+.annual-year span, .annual-year strong { display: block; font-weight: 500; white-space: nowrap; }
+.annual-year strong { color: var(--jade); font-size: 9px; }
 .annual-year:last-child { border-bottom: 0; }
 .simple-summary { display: flex; justify-content: space-between; align-items: center; margin: 13px 0 0; padding: 10px 12px; background: #f4f0e8; border-radius: 8px; font-size: 12px; }
 .simple-summary span { color: var(--muted); }
@@ -103,10 +103,15 @@ footer { text-align: center; font-size: 11px; color: var(--muted); padding: 9px;
   .section-heading { align-items: center; }
   .section-heading span { max-width: 72%; }
   .field-row { gap: 9px; }
-  .pillar-matrix { min-width: 344px; }
-  .pillar-matrix th, .pillar-matrix td { padding: 8px 5px; }
-  .pillar-matrix .row-label { width: 44px; }
-  .pillar-matrix .sha-value { font-size: 10px; }
-  .luck-item { flex-basis: 106px; }
+  .pillar-matrix { min-width: 0; }
+  .pillar-matrix th, .pillar-matrix td { padding: 5px 3px; }
+  .pillar-matrix .row-label { width: 40px; }
+  .pillar-matrix .sha-value { font-size: 9px; }
+  .luck-head { min-height: 58px; }
+  .luck-head strong { font-size: 13px; }
+  .luck-label { font-size: 8px; }
+  .luck-start-age, .luck-start-year { font-size: 7px; }
+  .annual-year { font-size: 9px; min-height: 30px; }
+  .annual-year strong { font-size: 10px; }
   .traditional-extra { grid-template-columns: 1fr; }
 }
