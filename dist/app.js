@@ -40,9 +40,10 @@ function make(tag, className, text) {
   return node;
 }
 function shown(id) { return document.getElementById(id).checked; }
-function startOffset(lunar, yun, solar) {
-  const jie = yun.isForward() ? lunar.getNextJie().getSolar() : lunar.getPrevJie().getSolar();
-  const elapsed = Math.floor(Math.abs(solarMillis(jie) - solarMillis(solar)) / 720000);
+function startOffset(yun, solar) {
+  const birth = solarMillis(solar) + 1000;
+  const jie = ApkTerms.getJie(birth, yun.isForward());
+  const elapsed = Math.floor(Math.abs(jie.time - birth) / 720000);
   return { years: Math.floor(elapsed / 360), months: Math.floor((elapsed % 360) / 30), days: elapsed % 30 };
 }
 function firstLuckAge(offset, mode, forward) {
@@ -107,6 +108,7 @@ function calculate() {
   const lunar = solar.getLunar();
   const eight = lunar.getEightChar();
   eight.setSect(document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  ApkTerms.correctPillars(lunar, eight, solarMillis(solar));
   const names = ['年柱', '月柱', '日柱', '时柱'];
   const keys = ['Year', 'Month', 'Day', 'Time'];
   const pillars = keys.map((key, i) => ({
@@ -116,15 +118,16 @@ function calculate() {
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
   const yun = eight.getYun(number('gender'));
-  const offset = startOffset(lunar, yun, solar);
+  const offset = startOffset(yun, solar);
   const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
   const birthPillarYear = lunar.getYearInGanZhiExact() === solarYearGanZhi ? solar.getYear() : solar.getYear() - 1;
   const yunMode = value('yun-mode');
   const luck = buildLuck(yun, solar, birthPillarYear, offset, yunMode);
-  const priorJie = lunar.getPrevJie();
-  const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(priorJie.getSolar().getYear(), priorJie.getSolar().getMonth() - 1, priorJie.getSolar().getDay())) / 86400000) + 1;
+  const priorJie = ApkTerms.getJie(solarMillis(solar) + 1000, false);
+  const jieDate = new Date(priorJie.time);
+  const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(jieDate.getUTCFullYear(), jieDate.getUTCMonth(), jieDate.getUTCDate())) / 86400000) + 1;
   const extras = [
-    ['节气', `出生于${priorJie.getName()}后第 ${daysAfterJie} 日`],
+    ['节气', `出生于${priorJie.name}后第 ${daysAfterJie} 日`],
     ['胎元', `${eight.getTaiYuan()} · ${eight.getTaiYuanNaYin()}`],
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
