@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#17252b">
+  <meta name="description" content="个人学习用八字排盘工具预览版">
+  <title>八字排盘 · 学习工具</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <span class="eyebrow">个人学习工具 · 预览版</span>
+      <h1>八字排盘</h1>
+      <p>输入出生时间，查看四柱与大运。计算结果仍在与原安卓软件逐项核对。</p>
+    </header>
+
+    <section class="panel" aria-labelledby="input-title">
+      <div class="section-heading"><h2 id="input-title">出生信息</h2><span>按北京时间填写</span></div>
+      <form id="chart-form">
+        <div class="field-row">
+          <label class="field"><span>历法</span><select id="calendar-type"><option value="solar">公历</option><option value="lunar">农历</option></select></label>
+          <label class="field"><span>性别</span><select id="gender"><option value="1">男</option><option value="0">女</option></select></label>
+        </div>
+        <div class="field-row triple">
+          <label class="field"><span>年</span><input id="year" type="number" min="1901" max="2099" placeholder="1990" required></label>
+          <label class="field"><span>月</span><input id="month" type="number" min="1" max="12" placeholder="5" required></label>
+          <label class="field"><span>日</span><input id="day" type="number" min="1" max="31" placeholder="17" required></label>
+        </div>
+        <label class="check hidden" id="leap-wrap"><input id="leap" type="checkbox"><span>农历闰月</span></label>
+        <div class="field-row">
+          <label class="field"><span>时</span><input id="hour" type="number" min="0" max="23" placeholder="8" required></label>
+          <label class="field"><span>分</span><input id="minute" type="number" min="0" max="59" placeholder="30" required></label>
+        </div>
+        <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原软件默认）</option><option value="24">24:00 换日（待核对）</option></select></label>
+        <button class="primary" type="submit">排盘</button>
+        <p id="error" class="error" role="alert" hidden></p>
+      </form>
+    </section>
+
+    <section class="panel result" id="result" aria-live="polite" hidden>
+      <div class="section-heading"><h2>四柱</h2><span id="result-date"></span></div>
+      <div id="pillars" class="pillars"></div>
+      <p class="note">当前采用开源历法计算；节气边界、太阳时和不同起运法尚未与原软件完成对照。</p>
+      <div class="section-heading subhead"><h2>大运参考</h2><span id="luck-start"></span></div>
+      <div id="luck" class="luck-list"></div>
+    </section>
+
+    <footer>数据只保留在当前页面，不上传出生信息。</footer>
+  </main>
+  <script src="lunar.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+/* global Solar, Lunar */
+const form = document.getElementById('chart-form');
+const error = document.getElementById('error');
+const result = document.getElementById('result');
+const calendarType = document.getElementById('calendar-type');
+calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
+
+function number(id) { return Number(document.getElementById(id).value); }
+function validDate(y, m, d) {
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+function safeText(value) { return String(value == null ? '' : value); }
+function solarMillis(solar) { return Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay(), solar.getHour(), solar.getMinute(), solar.getSecond()); }
+
+function startOffset(lunar, yun, solar) {
+  const jie = yun.isForward() ? lunar.getNextJie().getSolar() : lunar.getPrevJie().getSolar();
+  const elapsed = Math.floor(Math.abs(solarMillis(jie) - solarMillis(solar)) / 720000);
+  return { years: Math.floor(elapsed / 360), months: Math.floor((elapsed % 360) / 30), days: elapsed % 30 };
+}
+
+function calculate() {
+  const y = number('year'), m = number('month'), d = number('day');
+  const h = number('hour'), minute = number('minute');
+  if (![y, m, d, h, minute].every(Number.isInteger) || y < 1901 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31 || h < 0 || h > 23 || minute < 0 || minute > 59) throw new Error('请填写 1901—2099 年内的完整出生时间。');
+  let solar;
+  if (calendarType.value === 'lunar') {
+    const lunarMonth = document.getElementById('leap').checked ? -m : m;
+    const lunar = Lunar.fromYmdHms(y, lunarMonth, d, h, minute, 0);
+    if (lunar.getYear() !== y || lunar.getMonth() !== lunarMonth || lunar.getDay() !== d) throw new Error('农历日期不存在，请检查是否为闰月。');
+    solar = lunar.getSolar();
+    if (solar.getLunar().getYear() !== y || solar.getLunar().getMonth() !== lunarMonth || solar.getLunar().getDay() !== d) throw new Error('农历日期不存在，请检查是否为闰月。');
+    if (solar.getYear() < 1901 || solar.getYear() > 2099) throw new Error('转换后的公历日期超出当前支持范围。');
+  } else {
+    if (!validDate(y, m, d)) throw new Error('公历日期不存在，请检查年月日。');
+    solar = Solar.fromYmdHms(y, m, d, h, minute, 0);
+  }
+  const eight = solar.getLunar().getEightChar();
+  eight.setSect(document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  const names = ['年柱', '月柱', '日柱', '时柱'];
+  const keys = ['Year', 'Month', 'Day', 'Time'];
+  const pillars = keys.map((key, i) => ({
+    name: names[i],
+    ganzhi: eight[`get${key}`](),
+    nayin: eight[`get${key}NaYin`](),
+    shishen: key === 'Day' ? '日主' : eight[`get${key}ShiShenGan`]()
+  }));
+  const lunar = solar.getLunar();
+  const yun = eight.getYun(number('gender'));
+  const offset = startOffset(lunar, yun, solar);
+  const luck = yun.getDaYun(11).map(x => ({ ganzhi: x.getGanZhi() || '运前', startAge: x.getStartAge(), startYear: x.getStartYear() }));
+  return { solar, lunar, pillars, yun, offset, luck };
+}
+
+function render(data) {
+  document.getElementById('result-date').textContent = `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
+  const pillarContainer = document.getElementById('pillars');
+  pillarContainer.replaceChildren();
+  for (const pillar of data.pillars) {
+    const card = document.createElement('div'); card.className = 'pillar';
+    const label = document.createElement('div'); label.className = 'label'; label.textContent = pillar.name;
+    const ganzhi = document.createElement('div'); ganzhi.className = 'ganzhi'; ganzhi.textContent = safeText(pillar.ganzhi);
+    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${safeText(pillar.shishen)} · ${safeText(pillar.nayin)}`;
+    card.append(label, ganzhi, meta); pillarContainer.append(card);
+  }
+  document.getElementById('luck-start').textContent = `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`;
+  const luckContainer = document.getElementById('luck'); luckContainer.replaceChildren();
+  for (const item of data.luck) {
+    const card = document.createElement('div'); card.className = 'luck-item';
+    const title = document.createElement('strong'); title.textContent = item.ganzhi;
+    const sub = document.createElement('span'); sub.textContent = `${item.startAge} 岁起 · ${item.startYear} 年`;
+    card.append(title, sub); luckContainer.append(card);
+  }
+  result.hidden = false;
+  result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+form.addEventListener('submit', event => {
+  event.preventDefault(); error.hidden = true;
+  try { render(calculate()); }
+  catch (e) { result.hidden = true; error.textContent = e instanceof Error ? e.message : '排盘失败，请检查输入。'; error.hidden = false; }
+});
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
