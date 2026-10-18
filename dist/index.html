@@ -38,14 +38,14 @@
           <label class="field"><span>时</span><input id="hour" type="number" min="0" max="23" placeholder="8" required></label>
           <label class="field"><span>分</span><input id="minute" type="number" min="0" max="59" placeholder="30" required></label>
         </div>
-        <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原软件默认）</option><option value="24">24:00 换日（待核对）</option></select></label>
+        <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日（原版可选）</option></select></label>
         <div class="option-grid unavailable" aria-label="待校验的高级排盘选项" aria-disabled="true">
-          <label class="check"><input type="checkbox" disabled><span>早晚子</span></label>
+          <label class="check"><input type="checkbox" disabled><span>盲派晚子时（23:40）</span></label>
           <label class="check"><input type="checkbox" disabled><span>时辰不确定</span></label>
           <label class="check"><input type="checkbox" disabled><span>夏令时</span></label>
           <label class="check"><input type="checkbox" disabled><span>真太阳时</span></label>
         </div>
-        <p class="option-note">这些原版选项仍在逐项对照，暂不参与计算，避免产生看似有效的错误结果。</p>
+        <p class="option-note">盲派 23:40 换日、时辰不确定、夏令时和真太阳时仍待核对，暂不参与计算。</p>
         <details class="other-layouts"><summary>其他版面</summary><p>当前仅开放八字。奇门、紫微等版面保留为空入口，暂不提供内容。</p></details>
         <label class="field"><span>显示模式</span><select id="display-mode"><option value="traditional">传统</option><option value="fullscreen">全屏</option><option value="simple">精简</option><option value="analysis">分析</option></select></label>
         <button class="primary" type="submit">排盘</button>
