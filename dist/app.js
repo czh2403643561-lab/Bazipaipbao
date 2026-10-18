@@ -89,14 +89,13 @@ document.querySelector('.mode-tabs').addEventListener('click', event => {
   renderMode(latestData, button.dataset.mode);
 });
 document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, activeMode); });
+document.getElementById('taiyuan-toggle').addEventListener('click', event => {
+  if (!latestData) return;
+  showTaiYuan = !showTaiYuan;
+  renderMode(latestData, activeMode);
+  event.currentTarget.focus({ preventScroll: true });
+});
 modeOutput.addEventListener('click', event => {
-  const toggle = event.target.closest('[data-taiyuan-toggle]');
-  if (toggle) {
-    showTaiYuan = !showTaiYuan;
-    renderMode(latestData, activeMode);
-    modeOutput.querySelector('[data-taiyuan-toggle]')?.focus({ preventScroll: true });
-    return;
-  }
   const luck = event.target.closest('[data-luck-index]');
   if (luck) {
     selectedLuckIndex = Number(luck.dataset.luckIndex);
@@ -328,10 +327,6 @@ function renderElementSeason(data) {
 }
 function renderTraditional(data) {
   const fragment = document.createDocumentFragment();
-  const toolbar = make('div', 'chart-toolbar');
-  const taiToggle = make('button', 'taiyuan-toggle', `胎元 ${showTaiYuan ? '开' : '关'}`);
-  taiToggle.type = 'button'; taiToggle.dataset.taiyuanToggle = ''; taiToggle.setAttribute('aria-pressed', String(showTaiYuan));
-  toolbar.append(taiToggle); fragment.append(toolbar);
   const viewport = make('div', 'matrix-scroll');
   viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '原局与选中大运流年');
   const table = make('table', `pillar-matrix traditional-matrix${showTaiYuan ? ' with-taiyuan' : ''}`);
@@ -458,6 +453,10 @@ function renderFullscreen(data) {
 function renderMode(data, mode) {
   modeOutput.replaceChildren();
   for (const tab of document.querySelectorAll('[data-mode]')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
+  const taiToggle = document.getElementById('taiyuan-toggle');
+  taiToggle.hidden = mode === 'simple';
+  taiToggle.textContent = `胎元 ${showTaiYuan ? '开' : '关'}`;
+  taiToggle.setAttribute('aria-pressed', String(showTaiYuan));
   const titles = { traditional: '传统排盘', fullscreen: '全盘', simple: '精简排盘' };
   document.getElementById('result-title').textContent = titles[mode];
   if (mode === 'traditional') modeOutput.append(renderTraditional(data));
@@ -466,15 +465,17 @@ function renderMode(data, mode) {
 }
 function render(data) {
   const solarTime = `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`;
+  const solarTimeChinese = `${data.solar.getYear()}年${String(data.solar.getMonth()).padStart(2, '0')}月${String(data.solar.getDay()).padStart(2, '0')}日 ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`;
   const jie = new Date(data.priorJie.time);
   const jieTime = `${jie.getUTCFullYear()}年${String(jie.getUTCMonth() + 1).padStart(2, '0')}月${String(jie.getUTCDate()).padStart(2, '0')}日 ${String(jie.getUTCHours()).padStart(2, '0')}:${String(jie.getUTCMinutes()).padStart(2, '0')}`;
   document.getElementById('result-qian-kun').textContent = data.gender === 1 ? '乾' : '坤';
   document.getElementById('result-lunar').textContent = `农历：${data.lunar.toString()}`;
   document.getElementById('result-date').textContent = `阳历：${solarTime}`;
   document.getElementById('term-prior').textContent = `${data.priorJie.name}：${jieTime}`;
-  document.getElementById('term-birth').textContent = `出生：${solarTime}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
+  document.getElementById('term-birth').textContent = `出生：${solarTimeChinese}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
   selectedLuckIndex = null; selectedYearIndex = null;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
+  document.getElementById('chart-empty').hidden = true;
   showScreen('chart');
 }
 

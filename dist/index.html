@@ -39,14 +39,15 @@
 
       <section class="instant-card" aria-label="打开时刻的排盘">
         <div><div id="instant-pillars" class="instant-pillars"></div><small id="instant-lunar"></small><small id="instant-solar"></small></div>
-        <div class="instant-action"><strong id="instant-hour"></strong><button id="instant-chart" type="button">即时排盘</button></div>
+        <div class="instant-action"><strong id="instant-hour"></strong><button id="instant-chart" type="button">即时排盘</button><small class="refresh-hint">刷新页面更新即时盘</small></div>
       </section>
       <div class="future-grid" aria-label="预留功能"><div class="future-slot"></div><div class="future-slot tall"></div><div class="future-slot"></div></div>
     </section>
 
     <section id="chart-screen" class="app-screen chart-screen" aria-label="排盘结果" hidden>
+      <div id="chart-empty" class="chart-empty">排盘后，结果将在这里显示</div>
       <section class="result" id="result" aria-live="polite" hidden>
-        <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div>
+        <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="taiyuan-toggle" class="taiyuan-toggle" type="button" aria-pressed="false">胎元 关</button><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div>
         <div class="result-birth"><strong id="result-qian-kun"></strong><span id="result-lunar"></span><span id="result-date"></span></div>
         <div class="term-brief"><div id="term-prior"></div><div id="term-birth"></div></div>
         <div class="mode-tabs" aria-label="排盘显示方式"><button data-mode="traditional" type="button">传统排盘</button><button data-mode="fullscreen" type="button">全盘</button><button data-mode="simple" type="button">精简</button></div>
