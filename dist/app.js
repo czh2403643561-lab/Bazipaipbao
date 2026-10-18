@@ -10,8 +10,78 @@ let activeMode = 'traditional';
 let selectedLuckIndex = null;
 let selectedYearIndex = null;
 let showTaiYuan = false;
+let homeNowData = null;
+const birthSheet = document.getElementById('birth-sheet');
+const fourSheet = document.getElementById('four-sheet');
+const displaySheet = document.getElementById('display-sheet');
 
-calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
+function showScreen(name) {
+  for (const screen of document.querySelectorAll('.app-screen')) screen.hidden = screen.id !== `${name}-screen`;
+  for (const button of document.querySelectorAll('[data-nav]')) {
+    if (button.dataset.nav === name) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  window.scrollTo(0, 0);
+}
+function updateBirthSummary() {
+  const ids = ['year', 'month', 'day', 'hour', 'minute'];
+  const [year, month, day, hour, minute] = ids.map(id => document.getElementById(id).value.padStart(2, '0'));
+  document.getElementById('birth-summary').textContent = `${calendarType.value === 'lunar' ? '农历 ' : ''}${year}-${month}-${day} ${hour}:${minute}`;
+}
+function syncCalendarButtons() {
+  for (const button of document.querySelectorAll('[data-calendar]')) button.setAttribute('aria-pressed', String(button.dataset.calendar === calendarType.value));
+  document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar');
+  updateBirthSummary();
+}
+function switchCalendar(next) {
+  if (next === calendarType.value) return;
+  try {
+    const y = number('year'), m = number('month'), d = number('day'), h = number('hour'), minute = number('minute');
+    if (next === 'lunar' && validDate(y, m, d)) {
+      const lunar = Solar.fromYmdHms(y, m, d, h, minute, 0).getLunar();
+      document.getElementById('year').value = lunar.getYear();
+      document.getElementById('month').value = Math.abs(lunar.getMonth());
+      document.getElementById('day').value = lunar.getDay();
+      document.getElementById('leap').checked = lunar.getMonth() < 0;
+    } else if (next === 'solar') {
+      const lunarMonth = document.getElementById('leap').checked ? -m : m;
+      const solar = Lunar.fromYmdHms(y, lunarMonth, d, h, minute, 0).getSolar();
+      document.getElementById('year').value = solar.getYear();
+      document.getElementById('month').value = solar.getMonth();
+      document.getElementById('day').value = solar.getDay();
+      document.getElementById('leap').checked = false;
+    }
+  } catch (_) { /* Keep the entered values available for correction in the date sheet. */ }
+  calendarType.value = next;
+  syncCalendarButtons();
+}
+
+document.querySelector('.bottom-nav').addEventListener('click', event => {
+  const button = event.target.closest('[data-nav]');
+  if (button) showScreen(button.dataset.nav);
+});
+document.querySelector('.entry-choice-row').addEventListener('click', event => {
+  const sex = event.target.closest('[data-gender]');
+  if (sex) {
+    document.getElementById('gender').value = sex.dataset.gender;
+    for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button === sex));
+  }
+  const calendar = event.target.closest('[data-calendar]');
+  if (calendar?.dataset.calendar === 'four') { fourSheet.showModal(); return; }
+  if (calendar) switchCalendar(calendar.dataset.calendar);
+});
+document.getElementById('birth-trigger').addEventListener('click', () => birthSheet.showModal());
+document.getElementById('birth-close').addEventListener('click', () => { updateBirthSummary(); birthSheet.close(); });
+document.getElementById('birth-confirm').addEventListener('click', () => {
+  const dateError = document.getElementById('date-error');
+  try { calculate(); dateError.hidden = true; updateBirthSummary(); birthSheet.close(); }
+  catch (exception) { dateError.textContent = exception.message; dateError.hidden = false; }
+});
+document.getElementById('four-close').addEventListener('click', () => fourSheet.close());
+document.getElementById('display-trigger').addEventListener('click', () => displaySheet.showModal());
+document.getElementById('display-close').addEventListener('click', () => displaySheet.close());
+
+calendarType.addEventListener('change', syncCalendarButtons);
 document.querySelector('.mode-tabs').addEventListener('click', event => {
   const button = event.target.closest('[data-mode]');
   if (!button || !latestData) return;
@@ -153,7 +223,6 @@ function calculate() {
   const yunMode = value('yun-mode');
   const luck = buildLuck(yun, solar, birthPillarYear, offset, yunMode);
   const priorJie = ApkTerms.getJie(solarMillis(solar) + 1000, false);
-  const jieDate = new Date(priorJie.time);
   const daysAfterJie = Math.floor((solarMillis(solar) + 1000 - priorJie.time) / 86400000) + 1;
   const extras = [
     ['节气', `出生于${priorJie.name}后第 ${daysAfterJie} 日`],
@@ -161,7 +230,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
+  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -244,6 +313,19 @@ function renderChartCell(pillar, kind) {
   }
   return cell;
 }
+function renderElementSeason(data) {
+  const monthBranch = data.pillars[1].ganzhi[1];
+  const ruling = '寅卯'.includes(monthBranch) ? ['木', '火', '水', '金', '土']
+    : '巳午'.includes(monthBranch) ? ['火', '土', '木', '水', '金']
+    : '申酉'.includes(monthBranch) ? ['金', '水', '土', '火', '木']
+    : '亥子'.includes(monthBranch) ? ['水', '木', '金', '土', '火']
+    : ['土', '金', '火', '木', '水'];
+  const colors = { 木: 'wood', 火: 'fire', 土: 'earth', 金: 'metal', 水: 'water' };
+  const bar = make('div', 'element-season');
+  bar.setAttribute('aria-label', '五行旺相休囚死');
+  ruling.forEach((element, index) => bar.append(make('span', `season-${colors[element]}`, `${element}${'旺相休囚死'[index]}`)));
+  return bar;
+}
 function renderTraditional(data) {
   const fragment = document.createDocumentFragment();
   const toolbar = make('div', 'chart-toolbar');
@@ -272,14 +354,13 @@ function renderTraditional(data) {
     body.append(row);
   }
   table.append(body); viewport.append(table); fragment.append(viewport);
-  fragment.append(renderInteractiveLuck(data));
+  fragment.append(renderElementSeason(data), renderInteractiveLuck(data));
   if (shown('show-gates') && data.gates?.length) {
     const gateSection = make('section', 'extra-section'); gateSection.append(heading('关卡'));
     const gateList = make('div', 'traditional-extra');
     const gateItem = make('div', 'extra-item'); gateItem.append(make('span', '', '关卡'), make('strong', '', data.gates.join('、')));
     gateList.append(gateItem); gateSection.append(gateList); fragment.append(gateSection);
   }
-  if (shown('show-extras')) fragment.append(renderExtras(data));
   return fragment;
 }
 function renderExtras(data) {
@@ -384,29 +465,58 @@ function renderMode(data, mode) {
   else modeOutput.append(renderSimple(data));
 }
 function render(data) {
-  const title = data.name ? `${data.name} · ` : '';
-  document.getElementById('result-date').textContent = `${title}${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
+  const solarTime = `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`;
+  const jie = new Date(data.priorJie.time);
+  const jieTime = `${jie.getUTCFullYear()}年${String(jie.getUTCMonth() + 1).padStart(2, '0')}月${String(jie.getUTCDate()).padStart(2, '0')}日 ${String(jie.getUTCHours()).padStart(2, '0')}:${String(jie.getUTCMinutes()).padStart(2, '0')}`;
+  document.getElementById('result-qian-kun').textContent = data.gender === 1 ? '乾' : '坤';
+  document.getElementById('result-lunar').textContent = `农历：${data.lunar.toString()}`;
+  document.getElementById('result-date').textContent = `阳历：${solarTime}`;
+  document.getElementById('term-prior').textContent = `${data.priorJie.name}：${jieTime}`;
+  document.getElementById('term-birth').textContent = `出生：${solarTime}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
   selectedLuckIndex = null; selectedYearIndex = null;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
-  document.body.classList.add('chart-compact');
-  result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showScreen('chart');
 }
 
 document.getElementById('edit-birth').addEventListener('click', () => {
-  document.body.classList.remove('chart-compact');
-  document.getElementById('year').focus({ preventScroll: true });
-  document.querySelector('.input-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showScreen('home');
+  document.getElementById('chart-name').focus({ preventScroll: true });
 });
 
 document.getElementById('use-now').addEventListener('click', () => {
   const now = beijingNow();
-  calendarType.value = 'solar';
+  calendarType.value = 'solar'; syncCalendarButtons();
   document.getElementById('leap').checked = false;
   document.getElementById('leap-wrap').classList.add('hidden');
   for (const [id, part] of Object.entries(now)) document.getElementById(id).value = part;
+  updateBirthSummary();
   nowStatus.textContent = `已填入北京时间：${now.year}-${now.month}-${now.day} ${now.hour}:${now.minute}`;
   nowStatus.hidden = false;
 });
+
+document.getElementById('instant-chart').addEventListener('click', () => { if (homeNowData) render(homeNowData); });
+
+function initializeHomeNow() {
+  const now = beijingNow();
+  for (const [id, part] of Object.entries(now)) document.getElementById(id).value = part;
+  updateBirthSummary();
+  try {
+    homeNowData = calculate();
+    const box = document.getElementById('instant-pillars');
+    for (const pillar of homeNowData.pillars) {
+      const column = make('span', 'instant-pillar');
+      column.append(make('span', '', pillar.ganzhi[0]), make('span', '', pillar.ganzhi[1]));
+      box.append(column);
+    }
+    document.getElementById('instant-lunar').textContent = `农历：${homeNowData.lunar.toString()}`;
+    document.getElementById('instant-solar').textContent = `公历：${homeNowData.solar.toYmd()} ${now.hour}:${now.minute}`;
+    document.getElementById('instant-hour').textContent = `${homeNowData.pillars[3].ganzhi[1]}时 ${now.hour}:${now.minute}`;
+  } catch (exception) {
+    document.getElementById('instant-lunar').textContent = '当前时刻排盘暂不可用';
+    document.getElementById('instant-chart').disabled = true;
+  }
+}
+initializeHomeNow();
 
 form.addEventListener('submit', event => {
   event.preventDefault(); error.hidden = true;
