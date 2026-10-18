@@ -117,7 +117,7 @@ function calculate() {
     hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
-  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'));
   const gates = ApkShenSha.calculateGates(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(yun, solar);
@@ -127,7 +127,7 @@ function calculate() {
   const luck = buildLuck(yun, solar, birthPillarYear, offset, yunMode);
   const priorJie = ApkTerms.getJie(solarMillis(solar) + 1000, false);
   const jieDate = new Date(priorJie.time);
-  const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(jieDate.getUTCFullYear(), jieDate.getUTCMonth(), jieDate.getUTCDate())) / 86400000) + 1;
+  const daysAfterJie = Math.floor((solarMillis(solar) + 1000 - priorJie.time) / 86400000) + 1;
   const extras = [
     ['节气', `出生于${priorJie.name}后第 ${daysAfterJie} 日`],
     ['胎元', `${eight.getTaiYuan()} · ${eight.getTaiYuanNaYin()}`],

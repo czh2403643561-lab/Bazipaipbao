@@ -4,7 +4,7 @@
   const yes = (map, key, value) => map[key] === value;
   const inMap = (map, key, value) => (map[key] || '').includes(value);
 
-  function calculate(pillars, sect = 1) {
+  function calculate(pillars, sect = 1, gender = 1) {
     const stems = pillars.map(p => p.ganzhi[0]);
     const branches = pillars.map(p => p.ganzhi[1]);
     const [yearStem, , dayStem] = stems;
@@ -14,8 +14,9 @@
     const tianYi = {甲:'丑未',戊:'丑未',乙:'子申',己:'子申',丙:'亥酉',丁:'亥酉',壬:'卯巳',癸:'卯巳',庚:'寅午',辛:'寅午'};
     const wenChang = {甲:'巳',乙:'午',丙:'申',丁:'酉',戊:'申',己:'酉',庚:'亥',辛:'子',壬:'寅',癸:'卯'};
     const fuXing = {甲:'寅子',丙:'寅子',乙:'卯丑',癸:'卯丑',戊:'申',己:'未',丁:'亥',庚:'午',辛:'巳',壬:'辰'};
-    const guoYin = {甲:'戌',乙:'亥',丙:'丑',丁:'寅',戊:'丑',己:'寅',庚:'辰',辛:'巳',壬:'未',癸:'申'};
+    const guoYin = {甲:'巳',乙:'午',丙:'巳',丁:'午',戊:'申',庚:'亥',辛:'子',壬:'寅',癸:'卯'};
     const huaGai = {子:'辰',丑:'丑',寅:'戌',卯:'未',辰:'辰',巳:'丑',午:'戌',未:'未',申:'辰',酉:'丑',戌:'戌',亥:'未'};
+    const huaGaiDay = {子:'子',辰:'子',申:'子',寅:'午',午:'午',戌:'午',亥:'卯',卯:'卯',未:'卯',巳:'酉',酉:'酉',丑:'酉'};
     const taoHua = {子:'酉',丑:'午',寅:'卯',卯:'子',辰:'酉',巳:'午',午:'卯',未:'子',申:'酉',酉:'午',戌:'卯',亥:'子'};
     const piTou = {子:'辰',丑:'卯',寅:'寅',卯:'丑',辰:'戌',巳:'亥',午:'戌',未:'酉',申:'申',酉:'未',戌:'午',亥:'巳'};
     const guChen = {子:'寅',丑:'寅',寅:'巳',卯:'巳',辰:'巳',巳:'申',午:'申',未:'申',申:'亥',酉:'亥',戌:'亥',亥:'寅'};
@@ -48,7 +49,7 @@
     const yiMa = {子:'寅',丑:'亥',寅:'申',卯:'巳',辰:'寅',巳:'亥',午:'申',未:'巳',申:'寅',酉:'亥',戌:'申',亥:'巳'};
     const anJin = {子:'巳',午:'巳',卯:'巳',酉:'巳',寅:'酉',申:'酉',巳:'酉',亥:'酉',辰:'丑',戌:'丑',丑:'丑',未:'丑'};
     const hookForward = Object.fromEntries([...BRANCHES].map((b,i)=>[b,BRANCHES[(i+3)%12]]));
-    const hookReverse = Object.fromEntries([...BRANCHES].map((b,i)=>[b,BRANCHES[(i+8)%12]]));
+    const hookReverse = Object.fromEntries([...BRANCHES].map((b,i)=>[b,BRANCHES[(i+9)%12]]));
     const tianSaoPillar = {甲:'癸未',乙:'壬午',丙:'辛巳',丁:'庚辰',戊:'己卯',己:'戊寅',庚:'丁丑',辛:'丙子',壬:'乙亥',癸:'甲戌'};
     const saoTieChuang = {甲:'辰',己:'辰',乙:'寅',庚:'寅',丙:'戌',辛:'戌',丁:'申',壬:'申',戊:'酉',癸:'酉'};
     const tieSaoYang = {寅:'巳',午:'巳',戌:'巳',申:'寅',子:'寅',辰:'寅',巳:'未',酉:'未',丑:'未',亥:'卯',卯:'卯',未:'卯'};
@@ -72,7 +73,7 @@
       if (yes(yangRen, dayStem, branch)) names.push('阳刃');
       if ((index === 2 || index === 3) && ['乙丑','己巳','癸酉'].includes(ganzhi)) names.push('金神');
       if (yes(jinKui, yearBranch, branch)) names.push('金匮');
-      if (((index >= 1 && index <= 3) && yes(huaGai, yearBranch, branch)) || ((index === 0 || index === 1 || index === 3) && yes(huaGai, dayBranch, branch))) names.push('华盖');
+      if ((index !== 0 && yes(huaGai, yearBranch, branch)) || (index !== 2 && yes(huaGaiDay, dayBranch, branch))) names.push('华盖');
 
       // The APK's default method 2 checks year and day branches against each target pillar.
       if (hasBranch(taoHua, branch)) names.push('桃花');
@@ -95,7 +96,7 @@
       if ((index === 2 || index === 3) && guanFuPillars.has(ganzhi)) names.push('官符');
       if (index === 3 && yes(liuXiaStem, dayStem, stem)) names.push('流霞');
       const yangYear = '子寅辰午申戌'.includes(yearBranch);
-      const forward = sect === 1 ? yangYear : !yangYear;
+      const forward = gender === 1 ? yangYear : !yangYear;
       const yuanMap = forward ? yuanChenForward : yuanChenReverse;
       if (yes(yuanMap, yearBranch, branch)) names.push('元辰');
 
