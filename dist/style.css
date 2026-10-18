@@ -20,6 +20,11 @@ body { margin: 0; }
 .hero p { font-size: 13px; line-height: 1.6; color: var(--muted); margin: 0; }
 .panel { background: var(--card); border: 1px solid var(--line); border-top: 0; padding: 22px 24px; margin-bottom: 16px; }
 .result { border-top: 1px solid var(--line); border-radius: 15px; animation: appear .18s ease-out; }
+.chart-compact .hero, .chart-compact .input-panel { display: none; }
+.chart-compact .shell { padding-top: 0; }
+.result .result-heading { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 3px 8px; }
+.result-heading #result-date { grid-column: 1 / -1; grid-row: 2; max-width: none; text-align: left; white-space: normal; }
+.result-heading #edit-birth { grid-column: 2; grid-row: 1; }
 @keyframes appear { from { opacity: .35; transform: translateY(3px); } to { opacity: 1; transform: none; } }
 [hidden] { display: none !important; }
 .section-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 17px; }
@@ -69,6 +74,48 @@ input:focus, select:focus { outline: 2px solid #bd8b64; outline-offset: 1px; }
 .pillar-matrix .stem-value, .pillar-matrix .branch-value { font: 700 22px/1.2 "Songti SC", "Noto Serif CJK SC", serif; color: var(--accent-dark); }
 .pillar-matrix .branch-value { color: var(--jade); }
 .pillar-matrix .sha-value { text-align: left; font-size: 11px; color: #6d392d; }
+.chart-toolbar { display: flex; justify-content: flex-end; margin: -3px 0 5px; }
+.taiyuan-toggle { border: 1px solid #b9c7cd; border-radius: 4px; background: #fff; color: #315271; padding: 3px 8px; font: inherit; font-size: 11px; font-weight: 600; line-height: 1.3; cursor: pointer; }
+.taiyuan-toggle[aria-pressed="true"] { background: #e7f1ed; border-color: #55a583; color: #177352; }
+.traditional-matrix { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+.traditional-matrix th, .traditional-matrix td { border-right: 0; border-bottom: 0; padding: 4px 2px; line-height: 1.25; }
+.traditional-matrix thead th { background: #fff; color: #20436d; font-size: 11px; font-weight: 500; }
+.traditional-matrix .row-label { width: 41px; background: transparent; color: #214578; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.traditional-matrix .row-god, .traditional-matrix .row-hidden, .traditional-matrix .row-stage, .traditional-matrix .row-empty { background: #fff; }
+.traditional-matrix .row-stem, .traditional-matrix .row-branch, .traditional-matrix .row-sha { background: #f0efed; }
+.traditional-matrix .row-nayin, .traditional-matrix .row-self { background: #f9f8f6; }
+.traditional-matrix .row-sha .row-label { color: #d12e29; }
+.traditional-matrix .cell-stem, .traditional-matrix .cell-branch { padding: 3px 1px; }
+.traditional-matrix .big-character { font-size: 25px; font-weight: 800; line-height: 1.1; }
+.traditional-matrix .cell-god { font-size: 11px; }
+.traditional-matrix .cell-hidden { font-size: 9px; }
+.traditional-matrix .hidden-line, .traditional-matrix .sha-line { display: block; margin: 1px 0; }
+.traditional-matrix .hidden-god { margin-left: 1px; color: #314050; }
+.traditional-matrix .cell-nayin, .traditional-matrix .cell-stage, .traditional-matrix .cell-self, .traditional-matrix .cell-empty { font-size: 10px; }
+.traditional-matrix .cell-sha { font-size: 9px; overflow-wrap: anywhere; }
+.traditional-matrix .blank-period { background: rgba(234, 238, 240, .55); }
+.traditional-matrix.with-taiyuan .big-character { font-size: 23px; }
+.element-wood { color: #249b71; }
+.element-fire { color: #ff5d50; }
+.element-earth { color: #92764f; }
+.element-metal { color: #ff951b; }
+.element-water { color: #2d6fef; }
+.interactive-luck { margin: 9px 0 0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+.jiaoyun-line, .period-caption { margin: 0; padding: 5px 3px; background: #f2f2f2; color: #5c718a; font-size: 11px; line-height: 1.35; }
+.period-caption { margin-top: 7px; }
+.period-choices { display: grid; width: 100%; border-bottom: 1px solid #e8e8e8; }
+.period-tile { display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; border: 0; border-right: 1px solid #eee; border-radius: 0; padding: 5px 0 4px; background: #fff; color: #173a63; font-family: inherit; line-height: 1.15; cursor: pointer; }
+.period-tile:last-child { border-right: 0; }
+.period-tile[aria-pressed="true"] { background: #e9edef; box-shadow: inset 0 0 0 1px #b5c7d2; }
+.period-tile:focus-visible, .taiyuan-toggle:focus-visible { outline: 2px solid #bb2d2b; outline-offset: -2px; }
+.period-year { color: #163a66; font-size: 11px; white-space: nowrap; }
+.period-age { color: #1f2631; font-size: 10px; white-space: nowrap; }
+.period-glyph-line { display: flex; align-items: baseline; justify-content: center; white-space: nowrap; }
+.period-glyph { font-size: 21px; font-weight: 800; }
+.period-god { color: #334153; font-size: 9px; }
+.period-foot { min-height: 11px; color: #46576a; font-size: 9px; white-space: nowrap; }
+.preluck-label { color: #926050; font-size: 9px; line-height: 38px; white-space: nowrap; }
+.year-choices .period-tile { padding-top: 6px; }
 .block-title { font-size: 15px; margin: 22px 0 9px; border-left: 3px solid var(--accent); padding-left: 9px; }
 .traditional-extra { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
 .extra-item { padding: 5px 7px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: baseline; gap: 5px; min-width: 0; }
@@ -107,6 +154,16 @@ footer { text-align: center; font-size: 11px; color: var(--muted); padding: 9px;
   .pillar-matrix th, .pillar-matrix td { padding: 5px 3px; }
   .pillar-matrix .row-label { width: 40px; }
   .pillar-matrix .sha-value { font-size: 9px; }
+  .traditional-matrix .row-label { width: 35px; font-size: 10px; }
+  .traditional-matrix .big-character { font-size: 22px; }
+  .traditional-matrix.with-taiyuan .row-label { width: 31px; font-size: 9px; }
+  .traditional-matrix.with-taiyuan .big-character { font-size: 19px; }
+  .traditional-matrix.with-taiyuan .cell-hidden, .traditional-matrix.with-taiyuan .cell-sha { font-size: 8px; }
+  .period-year { font-size: 10px; }
+  .period-age { font-size: 9px; }
+  .period-glyph { font-size: 19px; }
+  .period-god { font-size: 8px; }
+  .period-foot { font-size: 8px; }
   .luck-head { min-height: 58px; }
   .luck-head strong { font-size: 13px; }
   .luck-label { font-size: 8px; }

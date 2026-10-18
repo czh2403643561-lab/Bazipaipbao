@@ -1,4 +1,4 @@
-/* global Solar, Lunar */
+/* global Solar, Lunar, LunarUtil */
 const form = document.getElementById('chart-form');
 const error = document.getElementById('error');
 const result = document.getElementById('result');
@@ -7,6 +7,9 @@ const modeOutput = document.getElementById('mode-output');
 const nowStatus = document.getElementById('now-status');
 let latestData = null;
 let activeMode = 'traditional';
+let selectedLuckIndex = null;
+let selectedYearIndex = null;
+let showTaiYuan = false;
 
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
 document.querySelector('.mode-tabs').addEventListener('click', event => {
@@ -16,6 +19,29 @@ document.querySelector('.mode-tabs').addEventListener('click', event => {
   renderMode(latestData, button.dataset.mode);
 });
 document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, activeMode); });
+modeOutput.addEventListener('click', event => {
+  const toggle = event.target.closest('[data-taiyuan-toggle]');
+  if (toggle) {
+    showTaiYuan = !showTaiYuan;
+    renderMode(latestData, activeMode);
+    modeOutput.querySelector('[data-taiyuan-toggle]')?.focus({ preventScroll: true });
+    return;
+  }
+  const luck = event.target.closest('[data-luck-index]');
+  if (luck) {
+    selectedLuckIndex = Number(luck.dataset.luckIndex);
+    selectedYearIndex = null;
+    renderMode(latestData, activeMode);
+    modeOutput.querySelector(`[data-luck-index="${selectedLuckIndex}"]`)?.focus({ preventScroll: true });
+    return;
+  }
+  const year = event.target.closest('[data-year-index]');
+  if (year) {
+    selectedYearIndex = Number(year.dataset.yearIndex);
+    renderMode(latestData, activeMode);
+    modeOutput.querySelector(`[data-year-index="${selectedYearIndex}"]`)?.focus({ preventScroll: true });
+  }
+});
 
 function number(id) { return Number(document.getElementById(id).value); }
 function value(id) { return document.getElementById(id).value.trim(); }
@@ -56,13 +82,15 @@ function buildLuck(yun, solar, birthPillarYear, offset, mode) {
   if (mode === 'year') {
     const result = daYun.map((item, index) => {
       const startYear = index === 0 ? birthPillarYear : item.getStartYear();
+      const annualItems = index === 0 ? [] : item.getLiuNian();
+      const minorItems = item.getXiaoYun(index === 0 ? Math.max(0, daYun[1].getStartYear() - birthPillarYear) : annualItems.length);
       const years = index === 0
         ? Array.from({ length: Math.max(0, daYun[1].getStartYear() - birthPillarYear) }, (_, i) => {
           const year = birthPillarYear + i;
           const ganzhi = Solar.fromYmdHms(year, 7, 1, 12, 0, 0).getLunar().getYearInGanZhi();
-          return { year, ganzhi };
+          return { year, ganzhi, xiaoyun: minorItems[i]?.getGanZhi() || '' };
         })
-        : item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() }));
+        : annualItems.map((annual, i) => ({ year: annual.getYear(), ganzhi: annual.getGanZhi(), xiaoyun: minorItems[i]?.getGanZhi() || '' }));
       return {
         ganzhi: item.getGanZhi() || '运前',
         startAge: index === 0 ? 1 : startYear - birthPillarYear + 1,
@@ -112,7 +140,7 @@ function calculate() {
   const keys = ['Year', 'Month', 'Day', 'Time'];
   const pillars = keys.map((key, i) => ({
     name: names[i], ganzhi: eight[`get${key}`](), nayin: eight[`get${key}NaYin`](),
-    shishen: key === 'Day' ? '日主' : eight[`get${key}ShiShenGan`](),
+    shishen: key === 'Day' ? '日干' : eight[`get${key}ShiShenGan`](),
     hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
@@ -133,7 +161,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, name: value('chart-name') };
+  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -150,33 +178,101 @@ function renderPillarStrip(data, detailed = false) {
   }
   return box;
 }
+function elementClass(character) {
+  if ('甲乙寅卯'.includes(character)) return 'wood';
+  if ('丙丁巳午'.includes(character)) return 'fire';
+  if ('戊己辰戌丑未'.includes(character)) return 'earth';
+  if ('庚辛申酉'.includes(character)) return 'metal';
+  if ('壬癸亥子'.includes(character)) return 'water';
+  return '';
+}
+function colored(character, className = '') { return make('span', `${className} element-${elementClass(character)}`, character); }
+function phaseFor(stem, branch) {
+  const stemIndex = LunarUtil.GAN.indexOf(stem) - 1;
+  const branchIndex = LunarUtil.ZHI.indexOf(branch) - 1;
+  if (stemIndex < 0 || branchIndex < 0) return '';
+  const offset = LunarUtil.CHANG_SHENG_OFFSET[stem];
+  const index = ((offset + (stemIndex % 2 === 0 ? branchIndex : -branchIndex)) % 12 + 12) % 12;
+  return LunarUtil.CHANG_SHENG[index];
+}
+function derivedPillar(data, name, ganzhi) {
+  if (!ganzhi || ganzhi === '运前') return { name, placeholder: true };
+  const [stem, branch] = ganzhi;
+  const dayStem = data.pillars[2].ganzhi[0];
+  const hiddenStems = LunarUtil.ZHI_HIDE_GAN[branch] || [];
+  const pillar = {
+    name, ganzhi, nayin: LunarUtil.NAYIN[ganzhi] || '',
+    shishen: LunarUtil.SHI_SHEN[dayStem + stem] || '',
+    hiddenStems, hiddenGods: hiddenStems.map(hidden => LunarUtil.SHI_SHEN[dayStem + hidden] || ''),
+    stage: phaseFor(dayStem, branch), empty: LunarUtil.getXunKong(ganzhi),
+  };
+  pillar.shenSha = ApkShenSha.calculate([...data.pillars, pillar], data.sect, data.gender)[4] || [];
+  return pillar;
+}
+function activeLuck(data) {
+  const periods = data.luck.slice(0, 11);
+  const period = selectedLuckIndex == null ? null : periods[selectedLuckIndex];
+  const annual = period && selectedYearIndex != null ? period.years[selectedYearIndex] : null;
+  return { periods, period, annual };
+}
+function chartColumns(data) {
+  const { period, annual } = activeLuck(data);
+  const columns = data.pillars.map((pillar, index) => ({ ...pillar, shenSha: data.shenSha[index] }));
+  if (showTaiYuan) columns.unshift(derivedPillar(data, '胎元', data.taiYuan));
+  columns.push(derivedPillar(data, '大运', period?.ganzhi));
+  columns.push(derivedPillar(data, '流年', annual?.ganzhi));
+  return columns;
+}
+function renderChartCell(pillar, kind) {
+  const cell = make('td', `chart-cell cell-${kind}${pillar.placeholder ? ' blank-period' : ''}`);
+  if (pillar.placeholder) return cell;
+  if (kind === 'stem' || kind === 'branch') {
+    cell.append(colored(pillar.ganzhi[kind === 'stem' ? 0 : 1], 'big-character'));
+  } else if (kind === 'hidden') {
+    pillar.hiddenStems.forEach((stem, index) => {
+      const line = make('span', 'hidden-line');
+      line.append(colored(stem), make('span', 'hidden-god', pillar.hiddenGods[index]));
+      cell.append(line);
+    });
+  } else if (kind === 'self') {
+    cell.textContent = phaseFor(pillar.ganzhi[0], pillar.ganzhi[1]);
+  } else if (kind === 'sha') {
+    for (const name of pillar.shenSha || []) cell.append(make('span', 'sha-line', name));
+  } else {
+    const values = { god: pillar.shishen, nayin: pillar.nayin, stage: pillar.stage, empty: pillar.empty };
+    cell.textContent = values[kind] || '';
+  }
+  return cell;
+}
 function renderTraditional(data) {
   const fragment = document.createDocumentFragment();
+  const toolbar = make('div', 'chart-toolbar');
+  const taiToggle = make('button', 'taiyuan-toggle', `胎元 ${showTaiYuan ? '开' : '关'}`);
+  taiToggle.type = 'button'; taiToggle.dataset.taiyuanToggle = ''; taiToggle.setAttribute('aria-pressed', String(showTaiYuan));
+  toolbar.append(taiToggle); fragment.append(toolbar);
   const viewport = make('div', 'matrix-scroll');
-  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '四柱数据表');
-  const table = make('table', 'pillar-matrix');
+  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '原局与选中大运流年');
+  const table = make('table', `pillar-matrix traditional-matrix${showTaiYuan ? ' with-taiyuan' : ''}`);
+  const columns = chartColumns(data);
   const head = make('thead');
   const headRow = make('tr');
-  headRow.append(make('th', 'row-label', '项目'));
-  for (const pillar of data.pillars) headRow.append(make('th', 'pillar-heading', pillar.name));
+  headRow.append(make('th', 'row-label', '日期'));
+  for (const pillar of columns) headRow.append(make('th', 'pillar-heading', pillar.name));
   head.append(headRow); table.append(head);
-  const rows = [
-    ['十神', data.pillars.map(p => p.shishen), ''],
-    ['天干', data.pillars.map(p => p.ganzhi[0]), 'stem-value'],
-    ['地支', data.pillars.map(p => p.ganzhi[1]), 'branch-value'],
-  ];
-  if (shown('show-hidden')) rows.push(['藏干', data.pillars.map(p => p.hiddenStems.map((stem, i) => `${stem} ${p.hiddenGods[i]}`).join(' · ') || '—'), '']);
-  if (shown('show-nayin')) rows.push(['纳音', data.pillars.map(p => p.nayin), '']);
-  if (shown('show-stage')) rows.push(['长生', data.pillars.map(p => p.stage), '']);
-  if (shown('show-empty')) rows.push(['空亡', data.pillars.map(p => p.empty), '']);
-  if (shown('show-shensha')) rows.push(['神煞', data.shenSha.map(names => names.length ? names.join('、') : '—'), 'sha-value']);
+  const rows = [['主星', 'god'], ['天干', 'stem'], ['地支', 'branch']];
+  if (shown('show-hidden')) rows.push(['藏气', 'hidden']);
+  if (shown('show-nayin')) rows.push(['纳音', 'nayin']);
+  if (shown('show-stage')) rows.push(['星运', 'stage'], ['自坐', 'self']);
+  if (shown('show-empty')) rows.push(['空亡', 'empty']);
+  if (shown('show-shensha')) rows.push(['神煞', 'sha']);
   const body = make('tbody');
-  for (const [label, values, valueClass] of rows) {
-    const row = make('tr'); row.append(make('th', 'row-label', label));
-    for (const value of values) row.append(make('td', valueClass, value));
+  for (const [label, kind] of rows) {
+    const row = make('tr', `chart-row row-${kind}`); row.append(make('th', 'row-label', label));
+    for (const pillar of columns) row.append(renderChartCell(pillar, kind));
     body.append(row);
   }
   table.append(body); viewport.append(table); fragment.append(viewport);
+  fragment.append(renderInteractiveLuck(data));
   if (shown('show-gates') && data.gates?.length) {
     const gateSection = make('section', 'extra-section'); gateSection.append(heading('关卡'));
     const gateList = make('div', 'traditional-extra');
@@ -184,7 +280,6 @@ function renderTraditional(data) {
     gateList.append(gateItem); gateSection.append(gateList); fragment.append(gateSection);
   }
   if (shown('show-extras')) fragment.append(renderExtras(data));
-  fragment.append(renderLuck(data));
   return fragment;
 }
 function renderExtras(data) {
@@ -194,6 +289,59 @@ function renderExtras(data) {
     const item = make('div', 'extra-item'); item.append(make('span', '', label), make('strong', '', content)); list.append(item);
   }
   section.append(list); return section;
+}
+function shortGod(name) {
+  return ({ 比肩: '比', 劫财: '劫', 食神: '食', 伤官: '伤', 偏财: '才', 正财: '财', 七杀: '杀', 正官: '官', 偏印: '枭', 正印: '印' })[name] || '';
+}
+function periodGlyphs(tile, ganzhi, dayStem) {
+  const [stem, branch] = ganzhi;
+  const stemLine = make('span', 'period-glyph-line');
+  stemLine.append(colored(stem, 'period-glyph'), make('small', 'period-god', shortGod(LunarUtil.SHI_SHEN[dayStem + stem])));
+  const mainStem = LunarUtil.ZHI_HIDE_GAN[branch]?.[0];
+  const branchLine = make('span', 'period-glyph-line');
+  branchLine.append(colored(branch, 'period-glyph'), make('small', 'period-god', shortGod(LunarUtil.SHI_SHEN[dayStem + mainStem])));
+  tile.append(stemLine, branchLine);
+}
+function renderInteractiveLuck(data) {
+  const section = make('section', 'interactive-luck');
+  const { periods, period } = activeLuck(data);
+  const dayStem = data.pillars[2].ganzhi[0];
+  section.append(make('p', 'jiaoyun-line', `交运：出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`));
+  const choices = make('div', 'period-choices dayun-choices');
+  choices.style.gridTemplateColumns = `repeat(${periods.length}, minmax(0, 1fr))`;
+  choices.setAttribute('role', 'group'); choices.setAttribute('aria-label', '选择大运');
+  periods.forEach((item, index) => {
+    const tile = make('button', 'period-tile'); tile.type = 'button'; tile.dataset.luckIndex = String(index);
+    tile.setAttribute('aria-pressed', String(index === selectedLuckIndex));
+    tile.setAttribute('aria-label', item.ganzhi === '运前' ? `${item.startYear}年 交运前` : `${item.startYear}年 ${item.startAge}岁 大运${item.ganzhi}`);
+    tile.append(make('span', 'period-year', String(item.startYear)), make('span', 'period-age', `${item.startAge}岁`));
+    if (item.ganzhi === '运前') {
+      tile.append(make('span', 'preluck-label', '运前'));
+    } else {
+      periodGlyphs(tile, item.ganzhi, dayStem);
+      tile.append(make('span', 'period-foot', phaseFor(dayStem, item.ganzhi[1])));
+    }
+    choices.append(tile);
+  });
+  section.append(choices);
+  if (period) {
+    const hasXiaoYun = period.years.some(item => item.xiaoyun);
+    const heading = make('p', 'period-caption', `${hasXiaoYun ? '流年 / 小运' : '流年'}（${period.startAge}岁起）`);
+    const years = make('div', 'period-choices year-choices');
+    years.style.gridTemplateColumns = `repeat(${period.years.length}, minmax(0, 1fr))`;
+    years.setAttribute('role', 'group'); years.setAttribute('aria-label', '选择流年');
+    period.years.forEach((item, index) => {
+      const tile = make('button', 'period-tile'); tile.type = 'button'; tile.dataset.yearIndex = String(index);
+      tile.setAttribute('aria-pressed', String(index === selectedYearIndex));
+      tile.setAttribute('aria-label', `${item.year}年 流年${item.ganzhi}`);
+      tile.append(make('span', 'period-year', String(item.year)));
+      periodGlyphs(tile, item.ganzhi, dayStem);
+      tile.append(make('span', 'period-foot', item.xiaoyun || ''));
+      years.append(tile);
+    });
+    section.append(heading, years);
+  }
+  return section;
 }
 function renderLuck(data) {
   const section = make('section', 'luck-section');
@@ -224,10 +372,7 @@ function renderSimple(data) {
   fragment.append(summary, renderLuck(data)); return fragment;
 }
 function renderFullscreen(data) {
-  const fragment = document.createDocumentFragment();
-  const card = make('section', 'full-card');
-  card.append(make('p', 'full-date', `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`), renderPillarStrip(data, true));
-  fragment.append(card, renderLuck(data)); return fragment;
+  return renderTraditional(data);
 }
 function renderMode(data, mode) {
   modeOutput.replaceChildren();
@@ -241,9 +386,17 @@ function renderMode(data, mode) {
 function render(data) {
   const title = data.name ? `${data.name} · ` : '';
   document.getElementById('result-date').textContent = `${title}${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
+  selectedLuckIndex = null; selectedYearIndex = null;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
+  document.body.classList.add('chart-compact');
   result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+document.getElementById('edit-birth').addEventListener('click', () => {
+  document.body.classList.remove('chart-compact');
+  document.getElementById('year').focus({ preventScroll: true });
+  document.querySelector('.input-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 document.getElementById('use-now').addEventListener('click', () => {
   const now = beijingNow();

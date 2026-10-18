@@ -20,7 +20,7 @@
       <p>清晰查看四柱、神煞、大运与流年，不提供命理解读。</p>
     </header>
 
-    <section class="panel" aria-labelledby="input-title">
+    <section class="panel input-panel" aria-labelledby="input-title">
       <div class="section-heading"><h2 id="input-title">出生信息</h2><button class="now-button" id="use-now" type="button">此刻</button></div>
       <form id="chart-form">
         <label class="field"><span>排盘名（可选）</span><input id="chart-name" type="text" autocomplete="off" placeholder="用于标记本次排盘"></label>
@@ -50,7 +50,7 @@
     </section>
 
     <section class="panel result" id="result" aria-live="polite" hidden>
-      <div class="section-heading"><h2 id="result-title">八字盘</h2><span id="result-date"></span></div>
+      <div class="section-heading result-heading"><h2 id="result-title">八字盘</h2><button id="edit-birth" class="now-button" type="button">修改出生信息</button><span id="result-date"></span></div>
       <div class="mode-tabs" aria-label="排盘显示方式">
         <button data-mode="traditional" type="button">传统排盘</button><button data-mode="fullscreen" type="button">全盘</button><button data-mode="simple" type="button">精简</button>
       </div>
