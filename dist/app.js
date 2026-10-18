@@ -117,6 +117,7 @@ function calculate() {
     hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
+  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(yun, solar);
   const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
@@ -132,7 +133,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, offset, luck, yunMode, extras, name: value('chart-name') };
+  return { solar, lunar, pillars, shenSha, offset, luck, yunMode, extras, name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -161,6 +162,7 @@ function renderTraditional(data) {
     if (shown('show-nayin')) rows.push(['纳音', pillar.nayin]);
     if (shown('show-stage')) rows.push(['长生', pillar.stage]);
     if (shown('show-empty')) rows.push(['旬空', pillar.empty]);
+    if (shown('show-shensha')) rows.push(['神煞', data.shenSha[data.pillars.indexOf(pillar)].join('、') || '—']);
     for (const [label, content] of rows) {
       const row = make('div', 'trad-row'); row.append(make('span', '', label), make('span', '', content)); card.append(row);
     }
