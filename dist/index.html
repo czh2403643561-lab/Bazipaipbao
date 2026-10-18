@@ -12,14 +12,18 @@
 <body>
   <main class="shell">
     <header class="hero">
-      <span class="eyebrow">个人学习工具 · 预览版</span>
+      <span class="eyebrow">个人学习工具 · 本地计算</span>
       <h1>八字排盘</h1>
-      <p>输入出生时间，查看四柱与大运。计算结果仍在与原安卓软件逐项核对。</p>
+      <p>按原版的输入逻辑填写出生资料，在手机上查看四种排盘样式。</p>
     </header>
 
     <section class="panel" aria-labelledby="input-title">
       <div class="section-heading"><h2 id="input-title">出生信息</h2><span>按北京时间填写</span></div>
       <form id="chart-form">
+        <div class="field-row">
+          <label class="field"><span>排盘名</span><input id="chart-name" type="text" autocomplete="name" placeholder="可不填"></label>
+          <label class="field"><span>出生地</span><input id="birth-place" type="text" placeholder="可不填"></label>
+        </div>
         <div class="field-row">
           <label class="field"><span>历法</span><select id="calendar-type"><option value="solar">公历</option><option value="lunar">农历</option></select></label>
           <label class="field"><span>性别</span><select id="gender"><option value="1">男</option><option value="0">女</option></select></label>
@@ -35,21 +39,26 @@
           <label class="field"><span>分</span><input id="minute" type="number" min="0" max="59" placeholder="30" required></label>
         </div>
         <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原软件默认）</option><option value="24">24:00 换日（待核对）</option></select></label>
+        <div class="option-grid" aria-label="高级排盘选项">
+          <label class="check"><input id="early-zi" type="checkbox"><span>早晚子</span></label>
+          <label class="check"><input id="unknown-time" type="checkbox"><span>时辰不确定</span></label>
+          <label class="check"><input id="dst" type="checkbox"><span>夏令时</span></label>
+          <label class="check"><input id="true-solar" type="checkbox"><span>真太阳时</span></label>
+        </div>
+        <p class="option-note">真太阳时需要经纬度；当前先保留原版入口，尚未参与计算。</p>
+        <label class="field"><span>显示模式</span><select id="display-mode"><option value="traditional">传统</option><option value="fullscreen">全屏</option><option value="simple">精简</option><option value="analysis">分析</option></select></label>
         <button class="primary" type="submit">排盘</button>
         <p id="error" class="error" role="alert" hidden></p>
       </form>
     </section>
 
     <section class="panel result" id="result" aria-live="polite" hidden>
-      <div class="section-heading"><h2>四柱</h2><span id="result-date"></span></div>
-      <div class="view-switch" aria-label="排盘显示方式"><button id="view-simple" type="button" aria-pressed="true">简洁</button><button id="view-detail" type="button" aria-pressed="false">传统 · 基础</button></div>
-      <div id="pillars" class="pillars"></div>
-      <div id="traditional" class="traditional" hidden></div>
-      <div id="traditional-extra" class="traditional-extra" hidden></div>
-      <p class="note">当前采用开源历法计算；节气边界、太阳时和不同起运法尚未与原软件完成对照。</p>
-      <div class="section-heading subhead"><h2>大运与流年</h2><span id="luck-start"></span></div>
-      <p class="note luck-hint">点击某一步大运，可查看该阶段逐年干支。</p>
-      <div id="luck" class="luck-list"></div>
+      <div class="section-heading"><h2 id="result-title">八字盘</h2><span id="result-date"></span></div>
+      <div class="mode-tabs" aria-label="排盘显示方式">
+        <button data-mode="traditional" type="button">传统</button><button data-mode="fullscreen" type="button">全屏</button><button data-mode="simple" type="button">精简</button><button data-mode="analysis" type="button">分析</button>
+      </div>
+      <div id="mode-output"></div>
+      <p class="note">四柱、大运、流年按开源历法本地计算；真太阳时、神煞和部分设置仍在逐项对照原版。</p>
     </section>
 
     <footer>数据只保留在当前页面，不上传出生信息。</footer>

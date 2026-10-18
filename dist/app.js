@@ -3,27 +3,32 @@ const form = document.getElementById('chart-form');
 const error = document.getElementById('error');
 const result = document.getElementById('result');
 const calendarType = document.getElementById('calendar-type');
-const simpleButton = document.getElementById('view-simple');
-const detailButton = document.getElementById('view-detail');
-function setView(detail) {
-  document.getElementById('pillars').hidden = detail;
-  document.getElementById('traditional').hidden = !detail;
-  document.getElementById('traditional-extra').hidden = !detail;
-  simpleButton.setAttribute('aria-pressed', String(!detail));
-  detailButton.setAttribute('aria-pressed', String(detail));
-}
-simpleButton.addEventListener('click', () => setView(false));
-detailButton.addEventListener('click', () => setView(true));
+const displayMode = document.getElementById('display-mode');
+const modeOutput = document.getElementById('mode-output');
+let latestData = null;
+
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
+document.querySelector('.mode-tabs').addEventListener('click', event => {
+  const button = event.target.closest('[data-mode]');
+  if (!button || !latestData) return;
+  displayMode.value = button.dataset.mode;
+  renderMode(latestData, button.dataset.mode);
+});
 
 function number(id) { return Number(document.getElementById(id).value); }
+function value(id) { return document.getElementById(id).value.trim(); }
 function validDate(y, m, d) {
   const date = new Date(y, m - 1, d);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
 }
-function safeText(value) { return String(value == null ? '' : value); }
+function safeText(item) { return String(item == null ? '' : item); }
 function solarMillis(solar) { return Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay(), solar.getHour(), solar.getMinute(), solar.getSecond()); }
-
+function make(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text != null) node.textContent = safeText(text);
+  return node;
+}
 function startOffset(lunar, yun, solar) {
   const jie = yun.isForward() ? lunar.getNextJie().getSolar() : lunar.getPrevJie().getSolar();
   const elapsed = Math.floor(Math.abs(solarMillis(jie) - solarMillis(solar)) / 720000);
@@ -40,32 +45,26 @@ function calculate() {
     const lunar = Lunar.fromYmdHms(y, lunarMonth, d, h, minute, 0);
     if (lunar.getYear() !== y || lunar.getMonth() !== lunarMonth || lunar.getDay() !== d) throw new Error('农历日期不存在，请检查是否为闰月。');
     solar = lunar.getSolar();
-    if (solar.getLunar().getYear() !== y || solar.getLunar().getMonth() !== lunarMonth || solar.getLunar().getDay() !== d) throw new Error('农历日期不存在，请检查是否为闰月。');
-    if (solar.getYear() < 1901 || solar.getYear() > 2099) throw new Error('转换后的公历日期超出当前支持范围。');
   } else {
     if (!validDate(y, m, d)) throw new Error('公历日期不存在，请检查年月日。');
     solar = Solar.fromYmdHms(y, m, d, h, minute, 0);
   }
-  const eight = solar.getLunar().getEightChar();
+  const lunar = solar.getLunar();
+  const eight = lunar.getEightChar();
   eight.setSect(document.getElementById('zi-rule').value === '23' ? 1 : 2);
   const names = ['年柱', '月柱', '日柱', '时柱'];
   const keys = ['Year', 'Month', 'Day', 'Time'];
   const pillars = keys.map((key, i) => ({
-    name: names[i],
-    ganzhi: eight[`get${key}`](),
-    nayin: eight[`get${key}NaYin`](),
+    name: names[i], ganzhi: eight[`get${key}`](), nayin: eight[`get${key}NaYin`](),
     shishen: key === 'Day' ? '日主' : eight[`get${key}ShiShenGan`](),
-    hiddenStems: eight[`get${key}HideGan`](),
-    hiddenGods: eight[`get${key}ShiShenZhi`](),
-    stage: eight[`get${key}DiShi`](),
-    empty: eight[`get${key}XunKong`]()
+    hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
+    stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
-  const lunar = solar.getLunar();
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(lunar, yun, solar);
-  const luck = yun.getDaYun(11).map(x => ({
-    ganzhi: x.getGanZhi() || '运前', startAge: x.getStartAge(), startYear: x.getStartYear(),
-    years: x.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() }))
+  const luck = yun.getDaYun(11).map(item => ({
+    ganzhi: item.getGanZhi() || '运前', startAge: item.getStartAge(), startYear: item.getStartYear(),
+    years: item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() })),
   }));
   const priorJie = lunar.getPrevJie();
   const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(priorJie.getSolar().getYear(), priorJie.getSolar().getMonth() - 1, priorJie.getSolar().getDay())) / 86400000) + 1;
@@ -73,74 +72,104 @@ function calculate() {
     ['节气', `出生于${priorJie.getName()}后第 ${daysAfterJie} 日`],
     ['胎元', `${eight.getTaiYuan()} · ${eight.getTaiYuanNaYin()}`],
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
-    ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`]
+    ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, yun, offset, luck, extras };
+  return { solar, lunar, pillars, offset, luck, extras, name: value('chart-name') };
 }
 
-function render(data) {
-  document.getElementById('result-date').textContent = `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
-  const pillarContainer = document.getElementById('pillars');
-  pillarContainer.replaceChildren();
+function heading(text, className = 'block-title') { return make('h3', className, text); }
+function renderPillarStrip(data, detailed = false) {
+  const box = make('div', detailed ? 'pillar-strip detailed-strip' : 'pillar-strip');
   for (const pillar of data.pillars) {
-    const card = document.createElement('div'); card.className = 'pillar';
-    const label = document.createElement('div'); label.className = 'label'; label.textContent = pillar.name;
-    const ganzhi = document.createElement('div'); ganzhi.className = 'ganzhi'; ganzhi.textContent = safeText(pillar.ganzhi);
-    const meta = document.createElement('div'); meta.className = 'meta'; meta.textContent = `${safeText(pillar.shishen)} · ${safeText(pillar.nayin)}`;
-    card.append(label, ganzhi, meta); pillarContainer.append(card);
+    const card = make('article', 'pillar-card');
+    card.append(make('span', 'pillar-label', pillar.name), make('strong', 'ganzhi', pillar.ganzhi));
+    if (detailed) card.append(make('span', 'small-god', pillar.shishen), make('span', 'small-nayin', pillar.nayin));
+    box.append(card);
   }
-  const traditionalContainer = document.getElementById('traditional');
-  traditionalContainer.replaceChildren();
+  return box;
+}
+function renderTraditional(data) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(renderPillarStrip(data, true));
+  const table = make('div', 'traditional-table');
   for (const pillar of data.pillars) {
-    const card = document.createElement('article'); card.className = 'trad-card';
-    const heading = document.createElement('h3'); heading.textContent = pillar.name;
-    const value = document.createElement('strong'); value.className = 'trad-ganzhi'; value.textContent = safeText(pillar.ganzhi);
-    card.append(heading, value);
+    const card = make('article', 'trad-card');
+    card.append(make('h3', '', pillar.name));
     const rows = [
-      ['天干十神', pillar.shishen],
-      ['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')],
-      ['纳音', pillar.nayin],
-      ['长生', pillar.stage],
-      ['旬空', pillar.empty]
+      ['天干十神', pillar.shishen], ['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')],
+      ['纳音', pillar.nayin], ['长生', pillar.stage], ['旬空', pillar.empty],
     ];
-    for (const [name, valueText] of rows) {
-      const row = document.createElement('div'); row.className = 'trad-row';
-      const label = document.createElement('span'); label.textContent = name;
-      const content = document.createElement('span'); content.textContent = safeText(valueText);
-      row.append(label, content); card.append(row);
+    for (const [label, content] of rows) {
+      const row = make('div', 'trad-row'); row.append(make('span', '', label), make('span', '', content)); card.append(row);
     }
-    traditionalContainer.append(card);
+    table.append(card);
   }
-  const extraContainer = document.getElementById('traditional-extra');
-  extraContainer.replaceChildren();
-  for (const [name, value] of data.extras) {
-    const item = document.createElement('div'); item.className = 'extra-item';
-    const label = document.createElement('span'); label.textContent = name;
-    const content = document.createElement('strong'); content.textContent = value;
-    item.append(label, content); extraContainer.append(item);
+  fragment.append(table, renderExtras(data), renderLuck(data));
+  return fragment;
+}
+function renderExtras(data) {
+  const section = make('section', 'extra-section'); section.append(heading('命盘信息'));
+  const list = make('div', 'traditional-extra');
+  for (const [label, content] of data.extras) {
+    const item = make('div', 'extra-item'); item.append(make('span', '', label), make('strong', '', content)); list.append(item);
   }
-  document.getElementById('luck-start').textContent = `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`;
-  const luckContainer = document.getElementById('luck'); luckContainer.replaceChildren();
+  section.append(list); return section;
+}
+function renderLuck(data) {
+  const section = make('section', 'luck-section');
+  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`));
+  const list = make('div', 'luck-list');
   for (const item of data.luck) {
-    const card = document.createElement('details'); card.className = 'luck-item';
-    const summary = document.createElement('summary');
-    const title = document.createElement('strong'); title.textContent = item.ganzhi;
-    const sub = document.createElement('span'); sub.textContent = `${item.startAge} 岁起 · ${item.startYear} 年`;
-    summary.append(title, sub); card.append(summary);
-    const years = document.createElement('div'); years.className = 'annual-list';
-    for (const annual of item.years) {
-      const year = document.createElement('div'); year.textContent = `${annual.year} ${annual.ganzhi}`; years.append(year);
-    }
-    card.append(years); luckContainer.append(card);
+    const card = make('details', 'luck-item');
+    const summary = make('summary');
+    summary.append(make('strong', '', item.ganzhi), make('span', '', `${item.startAge} 岁起 · ${item.startYear} 年`)); card.append(summary);
+    const years = make('div', 'annual-list');
+    for (const year of item.years) years.append(make('div', '', `${year.year} ${year.ganzhi}`));
+    card.append(years); list.append(card);
   }
-  result.hidden = false;
+  section.append(list); return section;
+}
+function renderSimple(data) {
+  const fragment = document.createDocumentFragment();
+  fragment.append(renderPillarStrip(data));
+  const summary = make('div', 'simple-summary');
+  summary.append(make('span', '', '起运'), make('strong', '', `${data.offset.years}年${data.offset.months}个月${data.offset.days}天`));
+  fragment.append(summary, renderLuck(data)); return fragment;
+}
+function renderFullscreen(data) {
+  const fragment = document.createDocumentFragment();
+  const card = make('section', 'full-card');
+  card.append(make('p', 'full-date', `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`), renderPillarStrip(data, true));
+  fragment.append(card, renderLuck(data)); return fragment;
+}
+function renderAnalysis(data) {
+  const fragment = document.createDocumentFragment();
+  const insight = make('section', 'analysis-summary');
+  insight.append(heading('分析摘要'), make('p', '', `日主为${data.pillars[2].ganzhi.slice(0, 1)}，四柱为 ${data.pillars.map(p => p.ganzhi).join(' ')}。`));
+  const tags = make('div', 'analysis-tags');
+  for (const [label, content] of data.extras) tags.append(make('span', '', `${label}：${content}`));
+  insight.append(tags); fragment.append(insight, renderTraditional(data)); return fragment;
+}
+function renderMode(data, mode) {
+  modeOutput.replaceChildren();
+  for (const tab of document.querySelectorAll('[data-mode]')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
+  const titles = { traditional: '传统排盘', fullscreen: '全屏排盘', simple: '精简排盘', analysis: '分析排盘' };
+  document.getElementById('result-title').textContent = titles[mode];
+  if (mode === 'traditional') modeOutput.append(renderTraditional(data));
+  else if (mode === 'fullscreen') modeOutput.append(renderFullscreen(data));
+  else if (mode === 'analysis') modeOutput.append(renderAnalysis(data));
+  else modeOutput.append(renderSimple(data));
+}
+function render(data) {
+  const title = data.name ? `${data.name} · ` : '';
+  document.getElementById('result-date').textContent = `${title}${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
+  latestData = data; renderMode(data, displayMode.value); result.hidden = false;
   result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 form.addEventListener('submit', event => {
   event.preventDefault(); error.hidden = true;
   try { render(calculate()); }
-  catch (e) { result.hidden = true; error.textContent = e instanceof Error ? e.message : '排盘失败，请检查输入。'; error.hidden = false; }
+  catch (exception) { result.hidden = true; error.textContent = exception instanceof Error ? exception.message : '排盘失败，请检查输入。'; error.hidden = false; }
 });
-
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
