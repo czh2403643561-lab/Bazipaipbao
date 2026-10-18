@@ -54,7 +54,7 @@ function firstLuckAge(offset, mode, forward) {
 function buildLuck(yun, solar, birthPillarYear, offset, mode) {
   const daYun = yun.getDaYun(11);
   if (mode === 'year') {
-    return daYun.map((item, index) => {
+    const result = daYun.map((item, index) => {
       const startYear = index === 0 ? birthPillarYear : item.getStartYear();
       const years = index === 0
         ? Array.from({ length: Math.max(0, daYun[1].getStartYear() - birthPillarYear) }, (_, i) => {
@@ -70,6 +70,10 @@ function buildLuck(yun, solar, birthPillarYear, offset, mode) {
         years,
       };
     });
+    if (result[0]?.ganzhi === '运前' && result[0].years.length === 0 && result[1]?.startYear === birthPillarYear) {
+      result.shift();
+    }
+    return result;
   }
   const firstAge = firstLuckAge(offset, mode, yun.isForward());
   const birthYear = birthPillarYear;
