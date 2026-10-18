@@ -3,20 +3,19 @@ const form = document.getElementById('chart-form');
 const error = document.getElementById('error');
 const result = document.getElementById('result');
 const calendarType = document.getElementById('calendar-type');
-const displayMode = document.getElementById('display-mode');
 const modeOutput = document.getElementById('mode-output');
 const nowStatus = document.getElementById('now-status');
 let latestData = null;
+let activeMode = 'traditional';
 
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
-displayMode.addEventListener('change', () => { if (latestData) renderMode(latestData, displayMode.value); });
 document.querySelector('.mode-tabs').addEventListener('click', event => {
   const button = event.target.closest('[data-mode]');
   if (!button || !latestData) return;
-  displayMode.value = button.dataset.mode;
+  activeMode = button.dataset.mode;
   renderMode(latestData, button.dataset.mode);
 });
-document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, displayMode.value); });
+document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, activeMode); });
 
 function number(id) { return Number(document.getElementById(id).value); }
 function value(id) { return document.getElementById(id).value.trim(); }
@@ -153,23 +152,32 @@ function renderPillarStrip(data, detailed = false) {
 }
 function renderTraditional(data) {
   const fragment = document.createDocumentFragment();
-  fragment.append(renderPillarStrip(data, true));
-  const table = make('div', 'traditional-table');
-  for (const pillar of data.pillars) {
-    const card = make('article', 'trad-card');
-    card.append(make('h3', '', pillar.name));
-    const rows = [['天干十神', pillar.shishen]];
-    if (shown('show-hidden')) rows.push(['藏干', pillar.hiddenStems.map((stem, i) => `${stem} ${pillar.hiddenGods[i]}`).join(' · ')]);
-    if (shown('show-nayin')) rows.push(['纳音', pillar.nayin]);
-    if (shown('show-stage')) rows.push(['长生', pillar.stage]);
-    if (shown('show-empty')) rows.push(['旬空', pillar.empty]);
-    if (shown('show-shensha')) rows.push(['神煞', data.shenSha[data.pillars.indexOf(pillar)].join('、') || '—']);
-    for (const [label, content] of rows) {
-      const row = make('div', 'trad-row'); row.append(make('span', '', label), make('span', '', content)); card.append(row);
-    }
-    table.append(card);
+  fragment.append(make('p', 'swipe-hint', '四柱逐列对照 · 横向滑动查看'));
+  const viewport = make('div', 'matrix-scroll');
+  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '四柱数据表，可横向滑动'); viewport.tabIndex = 0;
+  const table = make('table', 'pillar-matrix');
+  const head = make('thead');
+  const headRow = make('tr');
+  headRow.append(make('th', 'row-label', '项目'));
+  for (const pillar of data.pillars) headRow.append(make('th', 'pillar-heading', pillar.name));
+  head.append(headRow); table.append(head);
+  const rows = [
+    ['十神', data.pillars.map(p => p.shishen), ''],
+    ['天干', data.pillars.map(p => p.ganzhi[0]), 'stem-value'],
+    ['地支', data.pillars.map(p => p.ganzhi[1]), 'branch-value'],
+  ];
+  if (shown('show-hidden')) rows.push(['藏干', data.pillars.map(p => p.hiddenStems.map((stem, i) => `${stem} ${p.hiddenGods[i]}`).join(' · ') || '—'), '']);
+  if (shown('show-nayin')) rows.push(['纳音', data.pillars.map(p => p.nayin), '']);
+  if (shown('show-stage')) rows.push(['长生', data.pillars.map(p => p.stage), '']);
+  if (shown('show-empty')) rows.push(['空亡', data.pillars.map(p => p.empty), '']);
+  if (shown('show-shensha')) rows.push(['神煞', data.shenSha.map(names => names.length ? names.join('、') : '—'), 'sha-value']);
+  const body = make('tbody');
+  for (const [label, values, valueClass] of rows) {
+    const row = make('tr'); row.append(make('th', 'row-label', label));
+    for (const value of values) row.append(make('td', valueClass, value));
+    body.append(row);
   }
-  fragment.append(table);
+  table.append(body); viewport.append(table); fragment.append(viewport);
   if (shown('show-gates') && data.gates?.length) {
     const gateSection = make('section', 'extra-section'); gateSection.append(heading('关卡'));
     const gateList = make('div', 'traditional-extra');
@@ -181,7 +189,7 @@ function renderTraditional(data) {
   return fragment;
 }
 function renderExtras(data) {
-  const section = make('section', 'extra-section'); section.append(heading('命盘信息'));
+  const section = make('section', 'extra-section'); section.append(heading('附加排盘数据'));
   const list = make('div', 'traditional-extra');
   for (const [label, content] of data.extras) {
     const item = make('div', 'extra-item'); item.append(make('span', '', label), make('strong', '', content)); list.append(item);
@@ -191,17 +199,17 @@ function renderExtras(data) {
 function renderLuck(data) {
   const section = make('section', 'luck-section');
   const modeLabels = { year: '按年（原版默认）', cumulative: '按岁累加', simple: '按岁简化', rounded: '按岁舍入' };
-  section.append(heading('大运与流年'), make('p', 'luck-mode', `起运方式：${modeLabels[data.yunMode] || modeLabels.year}`), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`));
+  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运 · ${modeLabels[data.yunMode] || modeLabels.year}`), make('p', 'swipe-hint', '每列一组大运，下面是对应流年 · 横向滑动查看'));
   const list = make('div', 'luck-list');
   for (const item of data.luck) {
-    const card = make('details', 'luck-item');
-    const summary = make('summary');
-    summary.append(make('strong', '', item.ganzhi), make('span', '', `${item.startAge} 岁起 · ${item.startYear} 年`)); card.append(summary);
+    const card = make('article', 'luck-item');
+    const header = make('header', 'luck-head');
+    header.append(make('span', 'luck-label', item.ganzhi === '运前' ? '交运前' : '大运'), make('strong', '', item.ganzhi), make('span', 'luck-start-age', `${item.startAge} 岁起 · ${item.startYear} 年`)); card.append(header);
     const years = make('div', 'annual-list');
-    for (const year of item.years) years.append(make('div', '', `${year.year} ${year.ganzhi}`));
+    for (const year of item.years) years.append(make('div', 'annual-year', `${year.year}  ${year.ganzhi}`));
     card.append(years); list.append(card);
   }
-  section.append(list); return section;
+  const scroller = make('div', 'luck-scroll'); scroller.setAttribute('role', 'region'); scroller.setAttribute('aria-label', '大运与流年，可横向滑动'); scroller.tabIndex = 0; scroller.append(list); section.append(scroller); return section;
 }
 function renderSimple(data) {
   const fragment = document.createDocumentFragment();
@@ -216,29 +224,19 @@ function renderFullscreen(data) {
   card.append(make('p', 'full-date', `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`), renderPillarStrip(data, true));
   fragment.append(card, renderLuck(data)); return fragment;
 }
-function renderAnalysis(data) {
-  const fragment = document.createDocumentFragment();
-  const insight = make('section', 'analysis-summary');
-  insight.append(heading('命盘信息'), make('p', '', `日主：${data.pillars[2].ganzhi.slice(0, 1)} · 四柱：${data.pillars.map(p => p.ganzhi).join(' ')}`));
-  const tags = make('div', 'analysis-tags');
-  if (shown('show-extras')) for (const [label, content] of data.extras) tags.append(make('span', '', `${label}：${content}`));
-  if (tags.childElementCount) insight.append(tags);
-  fragment.append(insight, renderTraditional(data)); return fragment;
-}
 function renderMode(data, mode) {
   modeOutput.replaceChildren();
   for (const tab of document.querySelectorAll('[data-mode]')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
-  const titles = { traditional: '传统排盘', fullscreen: '全屏排盘', simple: '精简排盘', analysis: '分析排盘' };
+  const titles = { traditional: '传统排盘', fullscreen: '全盘', simple: '精简排盘' };
   document.getElementById('result-title').textContent = titles[mode];
   if (mode === 'traditional') modeOutput.append(renderTraditional(data));
   else if (mode === 'fullscreen') modeOutput.append(renderFullscreen(data));
-  else if (mode === 'analysis') modeOutput.append(renderAnalysis(data));
   else modeOutput.append(renderSimple(data));
 }
 function render(data) {
   const title = data.name ? `${data.name} · ` : '';
   document.getElementById('result-date').textContent = `${title}${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')} · 农历${data.lunar.toString()}`;
-  latestData = data; renderMode(data, displayMode.value); result.hidden = false;
+  latestData = data; renderMode(data, activeMode); result.hidden = false;
   result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

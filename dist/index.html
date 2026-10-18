@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#8d2a23">
-  <meta name="description" content="个人学习用八字排盘工具预览版">
+  <meta name="description" content="面向专业使用者的八字排盘工具；本机计算，不提供命理解读。">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="八字排盘">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -15,18 +15,15 @@
 <body>
   <main class="shell">
     <header class="hero">
-      <span class="eyebrow">个人学习工具 · 本地计算</span>
+      <span class="eyebrow">专业排盘工具 · 本机计算</span>
       <h1>八字排盘</h1>
-      <p>按原版的输入逻辑填写出生资料，在手机上查看四种八字排盘样式。</p>
+      <p>清晰查看四柱、神煞、大运与流年，不提供命理解读。</p>
     </header>
 
     <section class="panel" aria-labelledby="input-title">
       <div class="section-heading"><h2 id="input-title">出生信息</h2><button class="now-button" id="use-now" type="button">此刻</button></div>
       <form id="chart-form">
-        <div class="field-row">
-          <label class="field"><span>排盘名</span><input id="chart-name" type="text" autocomplete="name" placeholder="可不填"></label>
-          <label class="field"><span>出生地</span><input id="birth-place" type="text" placeholder="可不填"></label>
-        </div>
+        <label class="field"><span>排盘名（可选）</span><input id="chart-name" type="text" autocomplete="off" placeholder="用于标记本次排盘"></label>
         <div class="field-row">
           <label class="field"><span>历法</span><select id="calendar-type"><option value="solar">公历</option><option value="lunar">农历</option></select></label>
           <label class="field"><span>性别</span><select id="gender"><option value="1">男</option><option value="0">女</option></select></label>
@@ -41,17 +38,11 @@
           <label class="field"><span>时</span><input id="hour" type="number" min="0" max="23" placeholder="8" required></label>
           <label class="field"><span>分</span><input id="minute" type="number" min="0" max="59" placeholder="30" required></label>
         </div>
-        <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日（原版可选）</option></select></label>
-        <label class="field"><span>起运方式</span><select id="yun-mode"><option value="year">按年（原版默认）</option><option value="cumulative">按岁累加</option><option value="simple">按岁简化</option><option value="rounded">按岁舍入</option></select></label>
-        <div class="option-grid unavailable" aria-label="待校验的高级排盘选项" aria-disabled="true">
-          <label class="check"><input type="checkbox" disabled><span>盲派晚子时（23:40）</span></label>
-          <label class="check"><input type="checkbox" disabled><span>时辰不确定</span></label>
-          <label class="check"><input type="checkbox" disabled><span>夏令时</span></label>
-          <label class="check"><input type="checkbox" disabled><span>真太阳时</span></label>
-        </div>
-        <p class="option-note">盲派 23:40 换日、时辰不确定、夏令时和真太阳时仍待核对，暂不参与计算。</p>
-        <details class="other-layouts"><summary>其他版面</summary><p>当前仅开放八字。奇门、紫微等版面保留为空入口，暂不提供内容。</p></details>
-        <label class="field"><span>显示模式</span><select id="display-mode"><option value="traditional">传统</option><option value="fullscreen">全屏</option><option value="simple">精简</option><option value="analysis">分析</option></select></label>
+        <details class="settings-panel">
+          <summary>排盘设置</summary>
+          <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日</option></select></label>
+          <label class="field"><span>起运方式</span><select id="yun-mode"><option value="year">按年（原版默认）</option><option value="cumulative">按岁累加</option><option value="simple">按岁简化</option><option value="rounded">按岁舍入</option></select></label>
+        </details>
         <button class="primary" type="submit">排盘</button>
         <p id="now-status" class="now-status" role="status" aria-live="polite" hidden></p>
         <p id="error" class="error" role="alert" hidden></p>
@@ -61,9 +52,9 @@
     <section class="panel result" id="result" aria-live="polite" hidden>
       <div class="section-heading"><h2 id="result-title">八字盘</h2><span id="result-date"></span></div>
       <div class="mode-tabs" aria-label="排盘显示方式">
-        <button data-mode="traditional" type="button">传统</button><button data-mode="fullscreen" type="button">全屏</button><button data-mode="simple" type="button">精简</button><button data-mode="analysis" type="button">分析</button>
+        <button data-mode="traditional" type="button">传统排盘</button><button data-mode="fullscreen" type="button">全盘</button><button data-mode="simple" type="button">精简</button>
       </div>
-      <details class="display-settings" open>
+      <details class="display-settings">
         <summary>显示设置</summary>
         <div class="option-grid">
           <label class="check"><input id="show-hidden" type="checkbox" checked><span>显示藏干</span></label>
@@ -76,10 +67,10 @@
         </div>
       </details>
       <div id="mode-output"></div>
-      <p class="note">已移植 58/65 项默认目录规则：49 项四柱神煞、9 项关卡；余下 7 项及“其他”仍待接入。四柱、大运和流年在本机计算。</p>
+      <p class="note">本工具只提供排盘数据，不包含命理解读。49 项四柱神煞和 9 项关卡规则已接入，部分结果仍在对照原版；四柱、大运和流年在本机计算。</p>
     </section>
 
-    <footer>数据只保留在当前页面，不上传出生信息。</footer>
+    <footer>纯排盘工具 · 出生资料仅在本机计算，不上传。</footer>
   </main>
   <script src="lunar.js"></script>
   <script src="apk-terms-data.js"></script>
