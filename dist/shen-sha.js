@@ -46,6 +46,13 @@
     const yuanChenForward = Object.fromEntries([...BRANCHES].map((b, i) => [b, BRANCHES[(i + 7) % 12]]));
     const yuanChenReverse = Object.fromEntries([...BRANCHES].map((b, i) => [b, BRANCHES[(i + 5) % 12]]));
     const yiMa = {子:'寅',丑:'亥',寅:'申',卯:'巳',辰:'寅',巳:'亥',午:'申',未:'巳',申:'寅',酉:'亥',戌:'申',亥:'巳'};
+    const anJin = {子:'巳',午:'巳',卯:'巳',酉:'巳',寅:'酉',申:'酉',巳:'酉',亥:'酉',辰:'丑',戌:'丑',丑:'丑',未:'丑'};
+    const hookForward = Object.fromEntries([...BRANCHES].map((b,i)=>[b,BRANCHES[(i+3)%12]]));
+    const hookReverse = Object.fromEntries([...BRANCHES].map((b,i)=>[b,BRANCHES[(i+8)%12]]));
+    const tianSaoPillar = {甲:'癸未',乙:'壬午',丙:'辛巳',丁:'庚辰',戊:'己卯',己:'戊寅',庚:'丁丑',辛:'丙子',壬:'乙亥',癸:'甲戌'};
+    const saoTieChuang = {甲:'辰',己:'辰',乙:'寅',庚:'寅',丙:'戌',辛:'戌',丁:'申',壬:'申',戊:'酉',癸:'酉'};
+    const tieSaoYang = {寅:'巳',午:'巳',戌:'巳',申:'寅',子:'寅',辰:'寅',巳:'未',酉:'未',丑:'未',亥:'卯',卯:'卯',未:'卯'};
+    const tieSaoYin = {寅:'申',午:'申',戌:'申',申:'丑',子:'丑',辰:'丑',巳:'戌',酉:'戌',丑:'戌',亥:'酉',卯:'酉',未:'酉'};
 
     return pillars.map((pillar, index) => {
       const stem = stems[index], branch = branches[index], ganzhi = pillar.ganzhi;
@@ -109,11 +116,69 @@
       if (index !== 0 && (yes(tianXi, yearBranch, branch))) names.push('天喜');
       if (index !== 0 && (yes(hongLuan, yearBranch, branch))) names.push('红鸾');
 
+      if (index === 3 && yes(anJin, yearBranch, branch)) names.push('暗金');
+      const hook = forward ? yes(hookForward, yearBranch, branch) : yes(hookReverse, yearBranch, branch);
+      const jiao = forward ? yes(hookReverse, yearBranch, branch) : yes(hookForward, yearBranch, branch);
+      if (hook && jiao) names.push('钩绞');
+      else if (hook) names.push('钩');
+      else if (jiao) names.push('绞');
+      if (index === 2 && yearNayinElement === '火' && '戌亥'.includes(branch)) names.push('天罗');
+      if (index === 2 && ['水','土'].includes(yearNayinElement) && '辰巳'.includes(branch)) names.push('地网');
+      if (sect === 1 && (index === 1 || index === 3) && yes(tianSaoPillar, yearStem, ganzhi)) names.push('天扫');
+      if (index === 1 && sect === 2) {
+        const diSaoBranches = {金:'午未申',土:'卯辰巳',木:'卯辰巳',水:'酉戌亥',火:'子丑寅'};
+        if ((diSaoBranches[yearNayinElement] || '').includes(branch)) names.push('地扫');
+      }
+      if (index === 1 && yes(sect === 1 ? tieSaoYang : tieSaoYin, yearBranch, branch)) names.push('铁扫');
+      if (index === 3 && yes(saoTieChuang, yearStem, branch)) names.push('扫铁床');
+      const tieBanMonth = {甲:'辰',己:'辰',乙:'寅',庚:'寅',丙:'酉戌',辛:'酉戌'};
+      if (index === 1 && (tieBanMonth[dayStem] || '').includes(branch)) names.push('铁板');
+
       // The original default method 2 for 驿马 tests the year and day trines.
       if (yes(yiMa, yearBranch, branch) || yes(yiMa, dayBranch, branch)) names.push('驿马');
       return names;
     });
   }
 
-  window.ApkShenSha = { calculate, implementedDefaultNames: ['禄神','国印','太极','天乙','天医','月德','天德','福星','天赦','文昌','学堂','词馆','金舆','六秀','金神','将星','金匮','华盖','驿马','天喜','红鸾','阳刃','劫煞','灾煞','元辰','流霞','官符','病符','吊客','丧门','披头','披麻','六厄','亡神','十恶大败','孤辰寡宿','阴差阳错','红艳','桃花','八专','魁罡'] };
+  function calculateGates(pillars, sect = 1) {
+    const [year, month, day, hour] = pillars.map(p => p.ganzhi);
+    const yb = year[1], mb = month[1], ds = day[0], hb = hour[1];
+    const gates = [];
+
+    // APK i0.f() invokes these default-method rules into the separate "关卡" row.
+    const arrowHours = {寅卯辰:'酉戌辰',巳午未:'未卯子',申酉戌:'午寅丑',亥子丑:'亥申巳'};
+    if (sect === 1 && Object.entries(arrowHours).some(([months, hours]) => months.includes(mb) && hours.includes(hb))) gates.push('将军箭');
+
+    const brokenBridge = {寅:'寅',卯:'卯',辰:'申',巳:'丑',午:'戌',未:'酉',申:'辰',酉:'巳',戌:'午',亥:'未',子:'亥',丑:'子'};
+    if (brokenBridge[mb] === hb) gates.push('断桥关');
+
+    const chickenFly = {甲:'巳酉丑',乙:'巳酉丑',庚:'亥卯未',辛:'亥卯未',壬:'寅午戌',癸:'寅午戌',丙:'子',丁:'子',戊:'子',己:'子'};
+    if ((chickenFly[ds] || '').includes(hb)) gates.push('鸡飞关');
+
+    // Default method 2 uses p0.f(): year-branch group against hour branch.
+    const shortLife = {寅:'辰',午:'辰',戌:'辰',巳:'寅',酉:'寅',丑:'寅',申:'巳',子:'巳',辰:'巳',亥:'未',卯:'未',未:'未'};
+    if (shortLife[yb] === hb) gates.push('短命关');
+
+    const brokenGut = {甲:'午未',乙:'午未',丙:'辰巳',丁:'辰巳',庚:'寅',辛:'寅',壬:'丑',癸:'丑',戊:'午',己:'未'};
+    if ((brokenGut[ds] || '').includes(hb)) gates.push('断肠关');
+
+    const waterFire = {寅卯辰:'戌未',巳午未:'丑辰',申酉戌:'戌丑',亥子丑:'辰未'};
+    if (Object.entries(waterFire).some(([months, hours]) => months.includes(mb) && hours.includes(hb))) gates.push('水火关');
+
+    // APK source contains the literal "虎" for 庚辛, which is not a valid Earthly Branch;
+    // retain its behavior by not matching those two stems to any real hour branch.
+    const thunder = {甲:'丑',乙:'午',丙:'子',丁:'子',戊:'戌',己:'戌',壬:'酉',癸:'亥'};
+    if (thunder[ds] === hb) gates.push('雷公关');
+
+    const scald = {子午卯酉:'午',寅申巳亥:'寅',辰戌丑未:'未'};
+    if (Object.entries(scald).some(([years, hours]) => years.includes(yb) && hours === hb)) gates.push('烫火关');
+
+    // Default method 2 is p0.a0(), driven by month branch and hour branch.
+    const nightCry = {寅卯辰:'午',巳午未:'酉',申酉戌:'子',亥子丑:'卯'};
+    if (Object.entries(nightCry).some(([months, hours]) => months.includes(mb) && hours.includes(hb))) gates.push('夜啼关');
+    return gates;
+  }
+
+  const implementedDefaultNames = ['禄神','国印','太极','天乙','天医','月德','天德','福星','天赦','文昌','学堂','词馆','金舆','六秀','金神','将星','金匮','华盖','驿马','天喜','红鸾','阳刃','暗金','钩绞','劫煞','灾煞','元辰','流霞','官符','病符','吊客','丧门','披头','披麻','天罗地网','六厄','亡神','十恶大败','孤辰寡宿','阴差阳错','红艳','桃花','八专','魁罡','天扫','地扫','铁扫','扫铁床','铁板','将军箭','断桥关','鸡飞关','短命关','断肠关','水火关','雷公关','烫火关','夜啼关'];
+  window.ApkShenSha = { calculate, calculateGates, implementedDefaultNames };
 })();

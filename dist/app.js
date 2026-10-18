@@ -118,6 +118,7 @@ function calculate() {
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
   const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  const gates = ApkShenSha.calculateGates(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(yun, solar);
   const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
@@ -133,7 +134,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, shenSha, offset, luck, yunMode, extras, name: value('chart-name') };
+  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -169,6 +170,12 @@ function renderTraditional(data) {
     table.append(card);
   }
   fragment.append(table);
+  if (shown('show-gates') && data.gates?.length) {
+    const gateSection = make('section', 'extra-section'); gateSection.append(heading('关卡'));
+    const gateList = make('div', 'traditional-extra');
+    const gateItem = make('div', 'extra-item'); gateItem.append(make('span', '', '关卡'), make('strong', '', data.gates.join('、')));
+    gateList.append(gateItem); gateSection.append(gateList); fragment.append(gateSection);
+  }
   if (shown('show-extras')) fragment.append(renderExtras(data));
   fragment.append(renderLuck(data));
   return fragment;
