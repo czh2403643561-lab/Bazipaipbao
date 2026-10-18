@@ -8,6 +8,7 @@ const detailButton = document.getElementById('view-detail');
 function setView(detail) {
   document.getElementById('pillars').hidden = detail;
   document.getElementById('traditional').hidden = !detail;
+  document.getElementById('traditional-extra').hidden = !detail;
   simpleButton.setAttribute('aria-pressed', String(!detail));
   detailButton.setAttribute('aria-pressed', String(detail));
 }
@@ -62,8 +63,19 @@ function calculate() {
   const lunar = solar.getLunar();
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(lunar, yun, solar);
-  const luck = yun.getDaYun(11).map(x => ({ ganzhi: x.getGanZhi() || '运前', startAge: x.getStartAge(), startYear: x.getStartYear() }));
-  return { solar, lunar, pillars, yun, offset, luck };
+  const luck = yun.getDaYun(11).map(x => ({
+    ganzhi: x.getGanZhi() || '运前', startAge: x.getStartAge(), startYear: x.getStartYear(),
+    years: x.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() }))
+  }));
+  const priorJie = lunar.getPrevJie();
+  const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(priorJie.getSolar().getYear(), priorJie.getSolar().getMonth() - 1, priorJie.getSolar().getDay())) / 86400000) + 1;
+  const extras = [
+    ['节气', `出生于${priorJie.getName()}后第 ${daysAfterJie} 日`],
+    ['胎元', `${eight.getTaiYuan()} · ${eight.getTaiYuanNaYin()}`],
+    ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
+    ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`]
+  ];
+  return { solar, lunar, pillars, yun, offset, luck, extras };
 }
 
 function render(data) {
@@ -99,13 +111,27 @@ function render(data) {
     }
     traditionalContainer.append(card);
   }
+  const extraContainer = document.getElementById('traditional-extra');
+  extraContainer.replaceChildren();
+  for (const [name, value] of data.extras) {
+    const item = document.createElement('div'); item.className = 'extra-item';
+    const label = document.createElement('span'); label.textContent = name;
+    const content = document.createElement('strong'); content.textContent = value;
+    item.append(label, content); extraContainer.append(item);
+  }
   document.getElementById('luck-start').textContent = `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运`;
   const luckContainer = document.getElementById('luck'); luckContainer.replaceChildren();
   for (const item of data.luck) {
-    const card = document.createElement('div'); card.className = 'luck-item';
+    const card = document.createElement('details'); card.className = 'luck-item';
+    const summary = document.createElement('summary');
     const title = document.createElement('strong'); title.textContent = item.ganzhi;
     const sub = document.createElement('span'); sub.textContent = `${item.startAge} 岁起 · ${item.startYear} 年`;
-    card.append(title, sub); luckContainer.append(card);
+    summary.append(title, sub); card.append(summary);
+    const years = document.createElement('div'); years.className = 'annual-list';
+    for (const annual of item.years) {
+      const year = document.createElement('div'); year.textContent = `${annual.year} ${annual.ganzhi}`; years.append(year);
+    }
+    card.append(years); luckContainer.append(card);
   }
   result.hidden = false;
   result.scrollIntoView({ behavior: 'smooth', block: 'start' });
