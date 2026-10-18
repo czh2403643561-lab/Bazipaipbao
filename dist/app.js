@@ -5,6 +5,7 @@ const result = document.getElementById('result');
 const calendarType = document.getElementById('calendar-type');
 const displayMode = document.getElementById('display-mode');
 const modeOutput = document.getElementById('mode-output');
+const nowStatus = document.getElementById('now-status');
 let latestData = null;
 
 calendarType.addEventListener('change', () => document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar'));
@@ -19,6 +20,13 @@ document.querySelector('.display-settings').addEventListener('change', () => { i
 
 function number(id) { return Number(document.getElementById(id).value); }
 function value(id) { return document.getElementById(id).value.trim(); }
+function beijingNow() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).formatToParts(new Date()).reduce((result, part) => ({ ...result, [part.type]: part.value }), {});
+  return { year: parts.year, month: parts.month, day: parts.day, hour: parts.hour, minute: parts.minute };
+}
 function validDate(y, m, d) {
   const date = new Date(y, m - 1, d);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
@@ -176,6 +184,16 @@ function render(data) {
   latestData = data; renderMode(data, displayMode.value); result.hidden = false;
   result.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+document.getElementById('use-now').addEventListener('click', () => {
+  const now = beijingNow();
+  calendarType.value = 'solar';
+  document.getElementById('leap').checked = false;
+  document.getElementById('leap-wrap').classList.add('hidden');
+  for (const [id, part] of Object.entries(now)) document.getElementById(id).value = part;
+  nowStatus.textContent = `已填入北京时间：${now.year}-${now.month}-${now.day} ${now.hour}:${now.minute}`;
+  nowStatus.hidden = false;
+});
 
 form.addEventListener('submit', event => {
   event.preventDefault(); error.hidden = true;

@@ -18,7 +18,7 @@
     </header>
 
     <section class="panel" aria-labelledby="input-title">
-      <div class="section-heading"><h2 id="input-title">出生信息</h2><span>按北京时间填写</span></div>
+      <div class="section-heading"><h2 id="input-title">出生信息</h2><button class="now-button" id="use-now" type="button">此刻</button></div>
       <form id="chart-form">
         <div class="field-row">
           <label class="field"><span>排盘名</span><input id="chart-name" type="text" autocomplete="name" placeholder="可不填"></label>
@@ -49,6 +49,7 @@
         <details class="other-layouts"><summary>其他版面</summary><p>当前仅开放八字。奇门、紫微等版面保留为空入口，暂不提供内容。</p></details>
         <label class="field"><span>显示模式</span><select id="display-mode"><option value="traditional">传统</option><option value="fullscreen">全屏</option><option value="simple">精简</option><option value="analysis">分析</option></select></label>
         <button class="primary" type="submit">排盘</button>
+        <p id="now-status" class="now-status" role="status" aria-live="polite" hidden></p>
         <p id="error" class="error" role="alert" hidden></p>
       </form>
     </section>
