@@ -51,16 +51,28 @@ function firstLuckAge(offset, mode, forward) {
   if (mode === 'rounded') return Math.max(1, offset.years + (offset.months >= 5 ? 1 : 0));
   return Math.max(1, offset.years + (forward ? 1 : 0));
 }
-function buildLuck(yun, solar, offset, mode) {
+function buildLuck(yun, solar, birthPillarYear, offset, mode) {
   const daYun = yun.getDaYun(11);
   if (mode === 'year') {
-    return daYun.map(item => ({
-      ganzhi: item.getGanZhi() || '运前', startAge: item.getStartAge(), startYear: item.getStartYear(),
-      years: item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() })),
-    }));
+    return daYun.map((item, index) => {
+      const startYear = index === 0 ? birthPillarYear : item.getStartYear();
+      const years = index === 0
+        ? Array.from({ length: Math.max(0, daYun[1].getStartYear() - birthPillarYear) }, (_, i) => {
+          const year = birthPillarYear + i;
+          const ganzhi = Solar.fromYmdHms(year, 7, 1, 12, 0, 0).getLunar().getYearInGanZhi();
+          return { year, ganzhi };
+        })
+        : item.getLiuNian().map(annual => ({ year: annual.getYear(), ganzhi: annual.getGanZhi() }));
+      return {
+        ganzhi: item.getGanZhi() || '运前',
+        startAge: index === 0 ? 1 : startYear - birthPillarYear + 1,
+        startYear,
+        years,
+      };
+    });
   }
   const firstAge = firstLuckAge(offset, mode, yun.isForward());
-  const birthYear = solar.getYear();
+  const birthYear = birthPillarYear;
   return daYun.map((item, index) => {
     const startAge = index === 0 ? 1 : firstAge + (index - 1) * 10;
     const startYear = birthYear + startAge - 1;
@@ -101,8 +113,10 @@ function calculate() {
   }));
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(lunar, yun, solar);
+  const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
+  const birthPillarYear = lunar.getYearInGanZhiExact() === solarYearGanZhi ? solar.getYear() : solar.getYear() - 1;
   const yunMode = value('yun-mode');
-  const luck = buildLuck(yun, solar, offset, yunMode);
+  const luck = buildLuck(yun, solar, birthPillarYear, offset, yunMode);
   const priorJie = lunar.getPrevJie();
   const daysAfterJie = Math.floor((Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay()) - Date.UTC(priorJie.getSolar().getYear(), priorJie.getSolar().getMonth() - 1, priorJie.getSolar().getDay())) / 86400000) + 1;
   const extras = [
