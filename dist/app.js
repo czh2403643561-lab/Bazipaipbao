@@ -19,6 +19,8 @@ let fourEditIndex = 0;
 let fourPhase = 'stem';
 let fourPendingStem = '';
 let fourRecordZiRule = null;
+const autoSave = document.getElementById('auto-save');
+try { autoSave.checked = localStorage.getItem('bazi-auto-save') === '1'; } catch (_) { /* Private browsing can deny storage. */ }
 const birthSheet = document.getElementById('birth-sheet');
 const fourSheet = document.getElementById('four-sheet');
 const displaySheet = document.getElementById('display-sheet');
@@ -26,10 +28,11 @@ const displaySheet = document.getElementById('display-sheet');
 function showScreen(name) {
   for (const screen of document.querySelectorAll('.app-screen')) screen.hidden = screen.id !== `${name}-screen`;
   for (const button of document.querySelectorAll('[data-nav]')) {
-    if (button.dataset.nav === name) button.setAttribute('aria-current', 'page');
+    if (button.dataset.nav === name || (name === 'chart' && button.dataset.nav === 'home')) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
   window.scrollTo(0, 0);
+  if (name === 'cases') refreshCases();
 }
 function updateBirthSummary() {
   const ids = ['year', 'month', 'day', 'hour', 'minute'];
@@ -555,8 +558,8 @@ function calculate() {
     hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
-  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'));
-  const gates = ApkShenSha.calculateGates(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'), { solarMillis: solarMillis(solar), lunarMonth: lunar.getMonth() });
+  const gates = ApkShenSha.calculateGates(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'));
   const yun = eight.getYun(number('gender'));
   const offset = startOffset(yun, solar);
   const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
@@ -571,7 +574,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
+  return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name'), input: currentCaseInput() };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -816,11 +819,89 @@ function render(data) {
   document.getElementById('result-date').textContent = `阳历：${solarTime}${data.summerTime ? `（夏令时校正，原输入 ${inputSolarTime}）` : ''}`;
   document.getElementById('term-prior').textContent = `${data.priorJie.name}：${jieTime}`;
   document.getElementById('term-birth').textContent = `出生：${solarTimeChinese}${data.summerTime ? '（夏令时校正后）' : ''}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
-  selectedLuckIndex = null; selectedYearIndex = null;
+  const currentYear = Number(beijingNow().year);
+  selectedLuckIndex = data.luck.slice(0, 11).findIndex(period => period.years.some(item => item.year === currentYear));
+  if (selectedLuckIndex < 0) selectedLuckIndex = null;
+  selectedYearIndex = selectedLuckIndex == null ? null : data.luck[selectedLuckIndex].years.findIndex(item => item.year === currentYear);
+  if (selectedYearIndex < 0) selectedYearIndex = null;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
   document.getElementById('chart-empty').hidden = true;
+  document.getElementById('current-chart-hint').textContent = `${data.name || '未命名'} · ${solarTime}`;
   showScreen('chart');
+  const feedback = document.getElementById('case-save-feedback');
+  feedback.hidden = true;
+  if (autoSave.checked && !openingSavedCase) saveCurrentCase(data)
+    .then(() => { feedback.textContent = '已保存到本机案例'; feedback.hidden = false; })
+    .catch(error => { showCaseSaveError(error); feedback.textContent = '案例保存失败，请检查本机储存权限'; feedback.hidden = false; });
 }
+
+let openingSavedCase = false;
+function currentCaseInput() {
+  const input = { name: value('chart-name'), gender: value('gender'), calendar: value('calendar-type'),
+    year: value('year'), month: value('month'), day: value('day'), hour: value('hour'), minute: value('minute'),
+    leap: document.getElementById('leap').checked, summerTime: document.getElementById('summer-time').checked,
+    ziRule: value('zi-rule'), yunMode: value('yun-mode') };
+  return input;
+}
+function showCaseSaveError(error) {
+  const message = document.getElementById('cases-error');
+  message.textContent = `${error.message || '保存失败'}。请检查浏览器是否允许本地储存。`;
+  message.hidden = false;
+}
+async function saveCurrentCase(data) {
+  const input = data.input;
+  const id = JSON.stringify(input);
+  const previous = await CaseStore.get(id);
+  await CaseStore.put({ id, schemaVersion: 1, createdAt: previous?.createdAt || Date.now(), updatedAt: Date.now(),
+    input, display: { name: data.name || '未命名案例', gender: data.gender, solar: `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`, pillars: data.pillars.map(p => p.ganzhi) } });
+}
+async function refreshCases() {
+  const list = document.getElementById('cases-list');
+  const empty = document.getElementById('cases-empty');
+  const query = document.getElementById('case-search-input').value.trim().toLowerCase();
+  list.replaceChildren();
+  try {
+    const records = (await CaseStore.list()).filter(item => `${item.display.name} ${item.display.solar}`.toLowerCase().includes(query));
+    empty.hidden = records.length > 0;
+    empty.textContent = query ? '没有找到符合条件的案例' : '还没有收藏的案例\n打开首页“保存”，排盘后会自动收录';
+    for (const item of records) {
+      const row = make('button', 'case-row'); row.type = 'button'; row.dataset.caseId = item.id;
+      const details = make('span', 'case-details');
+      details.append(make('strong', '', item.display.name), make('span', '', item.display.gender === 1 ? '男' : '女'), make('small', '', item.display.solar));
+      const pillars = make('span', 'case-pillars');
+      for (const part of [0, 1]) {
+        const line = make('span', 'case-pillar-line');
+        item.display.pillars.forEach(pillar => line.append(colored(pillar[part])));
+        pillars.append(line);
+      }
+      row.append(details, pillars); list.append(row);
+    }
+    document.getElementById('cases-error').hidden = true;
+  } catch (error) { showCaseSaveError(error); empty.hidden = false; }
+}
+document.getElementById('case-search-input').addEventListener('input', refreshCases);
+document.getElementById('cases-list').addEventListener('click', async event => {
+  const row = event.target.closest('[data-case-id]'); if (!row) return;
+  try {
+    const record = await CaseStore.get(row.dataset.caseId); if (!record) return;
+    const input = record.input;
+    for (const field of ['name', 'gender', 'calendar', 'year', 'month', 'day', 'hour', 'minute', 'ziRule', 'yunMode']) {
+      const ids = { name: 'chart-name', calendar: 'calendar-type', ziRule: 'zi-rule', yunMode: 'yun-mode' };
+      document.getElementById(ids[field] || field).value = input[field];
+    }
+    document.getElementById('leap').checked = input.leap;
+    document.getElementById('summer-time').checked = input.summerTime;
+    for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button.dataset.gender === input.gender));
+    syncCalendarButtons(); updateBirthSummary();
+    openingSavedCase = true; render(calculate());
+  } catch (error) { showCaseSaveError(error); }
+  finally { openingSavedCase = false; }
+});
+autoSave.addEventListener('change', () => {
+  try { localStorage.setItem('bazi-auto-save', autoSave.checked ? '1' : '0'); }
+  catch (_) { showCaseSaveError(new Error('保存开关无法记住')); }
+});
+document.getElementById('current-chart').addEventListener('click', () => showScreen('chart'));
 
 document.getElementById('edit-birth').addEventListener('click', () => {
   showScreen('home');

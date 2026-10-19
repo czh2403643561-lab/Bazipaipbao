@@ -28,7 +28,7 @@
         <button id="birth-trigger" class="entry-row entry-action" type="button"><span>出生时间<small>（必填）</small></span><span class="entry-value"><span id="birth-summary"></span><b>›</b></span></button>
         <div class="entry-row muted-row"><span>出生地点</span><span>未知地 · 北京时间 <b>›</b></span></div>
         <div class="entry-row muted-row"><span>分组</span><span>全部 <b>›</b></span></div>
-        <div class="entry-foot"><span>真太阳时：暂未启用<br>出生地点与保存功能待接入</span><span class="save-label">保存 <i aria-hidden="true"></i></span></div>
+        <div class="entry-foot"><span>真太阳时：暂未启用<br>案例仅保存在此设备</span><label class="save-label">保存 <input id="auto-save" type="checkbox" role="switch"><i aria-hidden="true"></i></label></div>
         <details class="settings-panel"><summary>排盘设置</summary>
           <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日</option></select></label>
           <label class="field"><span>起运方式</span><select id="yun-mode"><option value="year">按年（原版默认）</option><option value="cumulative">按岁累加</option><option value="simple">按岁简化</option><option value="rounded">按岁舍入</option></select></label>
@@ -41,13 +41,13 @@
         <div><div id="instant-pillars" class="instant-pillars"></div><small id="instant-lunar"></small><small id="instant-solar"></small></div>
         <div class="instant-action"><strong id="instant-hour"></strong><button id="instant-chart" type="button">即时排盘</button><small class="refresh-hint">刷新页面更新即时盘</small></div>
       </section>
-      <div class="future-grid" aria-label="预留功能"><div class="future-slot"></div><div class="future-slot tall"></div><div class="future-slot"></div></div>
+      <div class="future-grid"><button id="current-chart" class="future-slot current-chart" type="button"><span class="current-chart-icon">☯</span><span>当前排盘</span><small id="current-chart-hint">排盘后在这里查看</small></button><div class="future-slot tall" aria-label="预留功能"></div><div class="future-slot" aria-label="预留功能"></div></div>
     </section>
 
-    <section id="chart-screen" class="app-screen chart-screen" aria-label="排盘结果" hidden>
+    <section id="chart-screen" class="app-screen chart-screen" aria-label="当前排盘" hidden>
       <div id="chart-empty" class="chart-empty">排盘后，结果将在这里显示</div>
       <section class="result" id="result" aria-live="polite" hidden>
-        <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="taiyuan-toggle" class="taiyuan-toggle" type="button" aria-pressed="false">胎元 关</button><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div>
+        <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="taiyuan-toggle" class="taiyuan-toggle" type="button" aria-pressed="false">胎元 关</button><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div><p id="case-save-feedback" class="case-save-feedback" role="status" hidden></p>
         <div class="result-birth"><strong id="result-qian-kun"></strong><span id="result-lunar"></span><span id="result-date"></span></div>
         <div class="term-brief"><div id="term-prior"></div><div id="term-birth"></div></div>
         <div class="mode-tabs" aria-label="排盘显示方式"><button data-mode="traditional" type="button">传统排盘</button><button data-mode="fullscreen" type="button">全盘</button><button data-mode="simple" type="button">精简</button></div>
@@ -55,10 +55,18 @@
         <p class="note">仅提供排盘数据；部分神煞结果仍在对照原版。</p>
       </section>
     </section>
+    <section id="cases-screen" class="app-screen cases-screen" aria-label="案例" hidden>
+      <div class="cases-top"><strong>我的案例</strong><span>保存在此设备</span></div>
+      <div class="case-search"><span aria-hidden="true">⌕</span><input id="case-search-input" type="search" placeholder="搜索姓名或出生日期" aria-label="搜索案例"></div>
+      <div class="case-filter"><button class="active" type="button">全部</button><button type="button" disabled>分组待接入</button><button type="button" disabled>筛选待接入</button><button type="button" disabled>编辑待接入</button></div>
+      <div id="cases-list" class="cases-list"></div>
+      <p id="cases-empty" class="cases-empty">还没有收藏的案例<br>打开首页“保存”，排盘后会自动收录</p>
+      <p id="cases-error" class="cases-error" role="alert" hidden></p>
+    </section>
     <section id="study-screen" class="app-screen empty-screen" aria-label="学堂" hidden></section>
     <section id="settings-screen" class="app-screen empty-screen" aria-label="设置" hidden></section>
 
-    <nav class="bottom-nav" aria-label="页面导航"><button data-nav="home" aria-current="page" type="button"><span>◉</span>首页</button><button data-nav="chart" type="button"><span>▤</span>排盘</button><button data-nav="study" type="button"><span>▦</span>学堂</button><button data-nav="settings" type="button"><span>⚙</span>设置</button></nav>
+    <nav class="bottom-nav" aria-label="页面导航"><button data-nav="home" aria-current="page" type="button"><span>◉</span>首页</button><button data-nav="cases" type="button"><span>▤</span>案例</button><button data-nav="study" type="button"><span>▦</span>学堂</button><button data-nav="settings" type="button"><span>⚙</span>设置</button></nav>
   </main>
 
   <dialog id="birth-sheet" class="sheet-dialog"><div class="sheet-head"><h2>出生时间</h2><button id="birth-close" type="button" aria-label="关闭">×</button></div>
@@ -83,6 +91,6 @@
   <dialog id="display-sheet" class="sheet-dialog display-sheet"><div class="sheet-head"><h2>显示设置</h2><button id="display-close" type="button" aria-label="关闭">×</button></div>
     <div class="display-settings option-grid"><label class="check"><input id="show-hidden" type="checkbox" checked><span>显示藏干</span></label><label class="check"><input id="show-nayin" type="checkbox" checked><span>显示纳音</span></label><label class="check"><input id="show-stage" type="checkbox" checked><span>显示长生</span></label><label class="check"><input id="show-empty" type="checkbox" checked><span>显示空亡</span></label><label class="check"><input id="show-shensha" type="checkbox" checked><span>显示神煞</span></label><label class="check"><input id="show-gates" type="checkbox"><span>显示关卡</span></label></div>
   </dialog>
-  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="app.js"></script>
+  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
   const yes = (map, key, value) => map[key] === value;
   const inMap = (map, key, value) => (map[key] || '').includes(value);
 
-  function calculate(pillars, sect = 1, gender = 1) {
+  function calculate(pillars, sect = 1, gender = 1, context = null) {
     const stems = pillars.map(p => p.ganzhi[0]);
     const branches = pillars.map(p => p.ganzhi[1]);
     const [yearStem, , dayStem] = stems;
@@ -40,7 +40,7 @@
     const wangShen = {子:'亥',丑:'申',寅:'巳',卯:'寅',辰:'亥',巳:'申',午:'巳',未:'寅',申:'亥',酉:'申',戌:'巳',亥:'寅'};
     const hongYan = {甲:'午',乙:'申',丙:'寅',丁:'未',戊:'辰',己:'辰',庚:'戌',辛:'酉',壬:'子',癸:'申'};
     const liuXiaStem = {甲:'酉',乙:'戌',丙:'未',丁:'申',戊:'己',己:'午',庚:'辰',辛:'卯',壬:'亥',癸:'寅'};
-    const guanFuPillars = new Set(['甲辰','乙亥','丙辰','丁酉','戊午','庚戌','庚寅','辛亥','壬寅','癸未']);
+    const guanFuBranches = {子:'巳',丑:'午',寅:'未',卯:'申',辰:'酉',巳:'戌',午:'亥',未:'子',申:'丑',酉:'寅',戌:'卯',亥:'辰'};
     const shiEDaBai = new Set(['甲辰','乙巳','壬申','丙申','丁亥','庚辰','戊戌','癸亥','辛巳','己丑']);
     const yinChaYangCuo = new Set(['丙子','丁丑','戊寅','辛卯','壬辰','癸巳','丙午','丁未','戊申','辛酉','壬戌','癸亥']);
     const baZhuan = new Set(['甲寅','乙卯','戊辰','戊戌','己未','庚申','辛酉','癸丑']);
@@ -55,7 +55,7 @@
     const tieSaoYang = {寅:'巳',午:'巳',戌:'巳',申:'寅',子:'寅',辰:'寅',巳:'未',酉:'未',丑:'未',亥:'卯',卯:'卯',未:'卯'};
     const tieSaoYin = {寅:'申',午:'申',戌:'申',申:'丑',子:'丑',辰:'丑',巳:'戌',酉:'戌',丑:'戌',亥:'酉',卯:'酉',未:'酉'};
 
-    return pillars.map((pillar, index) => {
+    const result = pillars.map((pillar, index) => {
       const stem = stems[index], branch = branches[index], ganzhi = pillar.ganzhi;
       const names = [];
       const hasStem = (table, target) => [yearStem, dayStem].some(s => inMap(table, s, target));
@@ -72,7 +72,7 @@
       if (hasStem(wenChang, branch)) names.push('文昌');
       if (yes(yangRen, dayStem, branch)) names.push('阳刃');
       if ((index === 2 || index === 3) && ['乙丑','己巳','癸酉'].includes(ganzhi)) names.push('金神');
-      if (yes(jinKui, yearBranch, branch)) names.push('金匮');
+      if (index !== 0 && yes(jinKui, yearBranch, branch)) names.push('金匮');
       if ((index !== 0 && yes(huaGai, yearBranch, branch)) || (index !== 2 && yes(huaGaiDay, dayBranch, branch))) names.push('华盖');
 
       // The APK's default method 2 checks year and day branches against each target pillar.
@@ -93,8 +93,8 @@
       if (hasStem(hongYan, branch)) names.push('红艳');
       if (index === 2 && baZhuan.has(ganzhi)) names.push('八专');
       if (index === 2 && ['壬辰','庚戌','庚辰','戊戌'].includes(ganzhi)) names.push('魁罡');
-      if ((index === 2 || index === 3) && guanFuPillars.has(ganzhi)) names.push('官符');
-      if (index === 3 && yes(liuXiaStem, dayStem, stem)) names.push('流霞');
+      if ((index === 2 || index === 3) && yes(guanFuBranches, yearBranch, branch)) names.push('官符');
+      if (index === 3 && yes(liuXiaStem, dayStem, branch)) names.push('流霞');
       const yangYear = '子寅辰午申戌'.includes(yearBranch);
       const forward = gender === 1 ? yangYear : !yangYear;
       const yuanMap = forward ? yuanChenForward : yuanChenReverse;
@@ -126,7 +126,7 @@
       if (index === 2 && yearNayinElement === '火' && '戌亥'.includes(branch)) names.push('天罗');
       if (index === 2 && ['水','土'].includes(yearNayinElement) && '辰巳'.includes(branch)) names.push('地网');
       if (sect === 1 && (index === 1 || index === 3) && yes(tianSaoPillar, yearStem, ganzhi)) names.push('天扫');
-      if (index === 1 && sect === 2) {
+      if (index === 1 && gender === 0) {
         const diSaoBranches = {金:'午未申',土:'卯辰巳',木:'卯辰巳',水:'酉戌亥',火:'子丑寅'};
         if ((diSaoBranches[yearNayinElement] || '').includes(branch)) names.push('地扫');
       }
@@ -139,9 +139,51 @@
       if (yes(yiMa, yearBranch, branch) || yes(yiMa, dayBranch, branch)) names.push('驿马');
       return names;
     });
+    if (pillars.length === 4 && context) {
+      const [year, month, day, hour] = pillars;
+      const hourBranch = hour.ganzhi[1];
+      const season = '寅卯辰'.includes(monthBranch) ? 0 : '巳午未'.includes(monthBranch) ? 1 : '申酉戌'.includes(monthBranch) ? 2 : 3;
+      const womenProsper = [
+        ['戊寅', ['甲寅', '癸丑']], ['甲午', ['庚午', '辛未']],
+        ['戊申', ['戊午', '己未']], ['甲子', ['甲子', '乙丑']],
+      ];
+      if (gender === 0 && day.ganzhi === womenProsper[season][0] && womenProsper[season][1].includes(hour.ganzhi)) result[2].push('旺夫');
+
+      // The APK's comparison uses the literal 枭神, while its ten-god table emits 偏印.
+      const hasGod = (pillar, god) => [pillar.shishen, ...pillar.hiddenGods].some(name => name === god);
+      const separated = season === 1
+        ? yes(yangRen, dayStem, yearBranch) && yes(yangRen, dayStem, hourBranch)
+        : hasGod(year, ['七杀', '', '枭神', '伤官'][season]) && hasGod(hour, ['七杀', '', '枭神', '伤官'][season]);
+      if (separated) result[2].push('隔婚');
+
+      const date = new Date(context.solarMillis);
+      const dayKey = Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+      const terms = [date.getUTCFullYear() - 1, date.getUTCFullYear(), date.getUTCFullYear() + 1]
+        .flatMap(yearNumber => ApkTerms.termsForCalendarYear(yearNumber));
+      const dayBefore = name => terms.some(term => term.name === name && Math.floor(term.time / 86400000) * 86400000 - 86400000 === dayKey);
+      if (['立春', '立夏', '立秋', '立冬'].some(dayBefore)) result[2].push('四绝');
+      if (['春分', '夏至', '秋分', '冬至'].some(dayBefore)) result[2].push('四离');
+
+      const lunarMonth = Math.abs(context.lunarMonth);
+      const yearElement = year.nayin.slice(-1);
+      const boHun = gender === 1
+        ? ((yearElement === '木' || yearElement === '土') && [2, 3, 4].includes(lunarMonth))
+          || (yearElement === '金' && [5, 6, 7].includes(lunarMonth))
+          || (yearElement === '水' && [8, 9, 10].includes(lunarMonth))
+          || (yearElement === '火' && [11, 12, 1].includes(lunarMonth))
+        : ((yearElement === '水' || yearElement === '火') && [2, 3, 4].includes(lunarMonth))
+          || (yearElement === '土' && [5, 6, 7].includes(lunarMonth))
+          || (yearElement === '金' && [8, 9, 10].includes(lunarMonth))
+          || (yearElement === '木' && [11, 12, 1].includes(lunarMonth));
+      // 驳婚 is present in the source dispatcher, but its visible placement/default
+      // differs from the six APK result screenshots. Keep the extracted condition
+      // available for further comparison instead of displaying an unverified hit.
+      void boHun;
+    }
+    return result;
   }
 
-  function calculateGates(pillars, sect = 1) {
+  function calculateGates(pillars, sect = 1, gender = 1) {
     const [year, month, day, hour] = pillars.map(p => p.ganzhi);
     const yb = year[1], mb = month[1], ds = day[0], hb = hour[1];
     const gates = [];
@@ -177,9 +219,16 @@
     // Default method 2 is p0.a0(), driven by month branch and hour branch.
     const nightCry = {寅卯辰:'午',巳午未:'酉',申酉戌:'子',亥子丑:'卯'};
     if (Object.entries(nightCry).some(([months, hours]) => months.includes(mb) && hours.includes(hb))) gates.push('夜啼关');
+    if (gender === 0) {
+      const element = pillars[0].nayin.slice(-1);
+      if (({ 金: '戌', 火: '未申', 木: '辰', 水: '丑寅', 土: '丑寅' }[element] || '').includes(hb)) gates.push('铁蛇关');
+    }
+    if (('寅申巳亥'.includes(mb) && '辰戌丑未'.includes(hb))
+      || ('子午卯酉'.includes(mb) && '寅申巳亥'.includes(hb))
+      || ('辰戌丑未'.includes(mb) && '子午卯酉'.includes(hb))) gates.push('百日关');
     return gates;
   }
 
-  const implementedDefaultNames = ['禄神','国印','太极','天乙','天医','月德','天德','福星','天赦','文昌','学堂','词馆','金舆','六秀','金神','将星','金匮','华盖','驿马','天喜','红鸾','阳刃','暗金','钩绞','劫煞','灾煞','元辰','流霞','官符','病符','吊客','丧门','披头','披麻','天罗地网','六厄','亡神','十恶大败','孤辰寡宿','阴差阳错','红艳','桃花','八专','魁罡','天扫','地扫','铁扫','扫铁床','铁板','将军箭','断桥关','鸡飞关','短命关','断肠关','水火关','雷公关','烫火关','夜啼关'];
+  const implementedDefaultNames = ['禄神','国印','太极','天乙','天医','月德','天德','福星','天赦','文昌','学堂','词馆','金舆','六秀','金神','旺夫','将星','金匮','华盖','驿马','天喜','红鸾','阳刃','暗金','钩绞','劫煞','灾煞','元辰','流霞','官符','病符','吊客','丧门','披头','披麻','天罗地网','六厄','亡神','十恶大败','孤辰寡宿','阴差阳错','红艳','桃花','八专','魁罡','隔婚','四绝','四离','天扫','地扫','铁扫','扫铁床','铁板','将军箭','铁蛇关','百日关','断桥关','鸡飞关','短命关','断肠关','水火关','雷公关','烫火关','夜啼关'];
   window.ApkShenSha = { calculate, calculateGates, implementedDefaultNames };
 })();
