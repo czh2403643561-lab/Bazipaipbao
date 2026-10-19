@@ -62,18 +62,22 @@
   </main>
 
   <dialog id="birth-sheet" class="sheet-dialog"><div class="sheet-head"><h2>出生时间</h2><button id="birth-close" type="button" aria-label="关闭">×</button></div>
-    <div class="date-fields"><label>年<input id="year" type="number" min="1901" max="2099"></label><label>月<input id="month" type="number" min="1" max="12"></label><label>日<input id="day" type="number" min="1" max="31"></label><label>时<input id="hour" type="number" min="0" max="23"></label><label>分<input id="minute" type="number" min="0" max="59"></label></div>
-    <label class="check hidden" id="leap-wrap"><input id="leap" type="checkbox"><span>农历闰月</span></label>
+    <div id="solar-input-panel"><div class="quick-entry"><input id="birth-shortcut" type="text" inputmode="numeric" maxlength="13" placeholder="出生年月日时分，如 20030506.0720" aria-label="快捷输入出生年月日时分"><button id="shortcut-confirm" type="button">确认</button></div><p class="quick-entry-hint">输入后点确认，自动填入下方时间</p></div>
+    <div class="date-fields"><label>年<input id="year" type="number" min="1801" max="2099"></label><label class="solar-only">月<input id="month" type="number" min="1" max="12"></label><label class="solar-only">日<input id="day" type="number" min="1" max="31"></label><label class="solar-only">时<input id="hour" type="number" min="0" max="23"></label><label class="solar-only">分<input id="minute" type="number" min="0" max="59"></label></div>
+    <input id="leap" type="checkbox" hidden>
+    <div id="lunar-wheel-panel" hidden><div class="lunar-wheel-labels"><span>年</span><span>月</span><span>日</span><span>时</span><span>分</span></div><div class="lunar-wheels"><div class="lunar-wheel" data-wheel="year" aria-label="农历年份"></div><div class="lunar-wheel" data-wheel="month" aria-label="农历月份"></div><div class="lunar-wheel" data-wheel="day" aria-label="农历日期"></div><div class="lunar-wheel" data-wheel="hour" aria-label="出生时辰"></div><div class="lunar-wheel" data-wheel="minute" aria-label="出生分钟"></div></div></div>
+    <label class="check summer-time-check"><input id="summer-time" type="checkbox"><span>夏令时</span><button id="summer-help" type="button" aria-label="夏令时说明">?</button></label><p id="summer-hint" class="summer-hint">勾选后按排盘宝规则减去 1 小时；支持中国大陆 1986—1991 年时段。</p>
     <div class="date-actions"><button id="use-now" type="button">此刻</button><button id="birth-confirm" type="button">确定</button></div>
     <p id="now-status" class="now-status" role="status" hidden></p><p id="date-error" class="error" role="alert" hidden></p>
   </dialog>
 
-  <dialog id="four-sheet" class="sheet-dialog four-sheet"><div class="sheet-head"><div class="segmented"><span>公历</span><span>农历</span><strong>四柱</strong></div><button id="four-close" type="button">关闭</button></div>
+  <dialog id="four-sheet" class="sheet-dialog four-sheet"><div class="sheet-head"><div class="segmented"><span>公历</span><span>农历</span><strong>四柱</strong></div><div class="four-actions"><button id="four-close" type="button" aria-label="关闭">×</button><button id="four-confirm" type="button" disabled>确认排盘</button></div></div>
     <div class="four-slot-labels"><span>年柱</span><span>月柱</span><span>日柱</span><span>时柱</span></div>
-    <div class="four-slots" aria-label="四柱预留输入"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <div class="four-range"><b>查找范围：</b><span>1801~2099年 ⇄</span><small>清除</small></div>
-    <div class="stem-grid" aria-label="天干展示，暂不可选择"><span class="element-wood">甲</span><span class="element-wood">乙</span><span class="element-fire">丙</span><span class="element-fire">丁</span><span class="element-earth">戊</span><span class="element-earth">己</span><span class="element-metal">庚</span><span class="element-metal">辛</span><span class="element-water">壬</span><span class="element-water">癸</span></div>
-    <p class="four-hint">四柱反查规则待接入，目前暂不可选择。</p>
+    <div id="four-slots" class="four-slots" aria-label="四柱选择"></div>
+    <div class="four-range"><b>查找范围：</b><span>1801—2099年</span><button id="four-clear" type="button">清除</button></div>
+    <div id="four-options" class="stem-grid" aria-label="当前可选干支"></div>
+    <div id="four-candidates" class="four-candidates" hidden><p>请选择对应出生日期和时辰</p><div id="four-candidate-list"></div><label>出生分钟<input id="four-minute" type="number" min="0" max="59" value="30"></label></div>
+    <p id="four-hint" class="four-hint">先选年柱；后续选项会按真实历法日期筛选。</p><p id="four-error" class="error" role="alert" hidden></p>
   </dialog>
 
   <dialog id="display-sheet" class="sheet-dialog display-sheet"><div class="sheet-head"><h2>显示设置</h2><button id="display-close" type="button" aria-label="关闭">×</button></div>

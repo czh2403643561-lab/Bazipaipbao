@@ -1,4 +1,4 @@
-/* global Solar, Lunar, LunarUtil */
+/* global Solar, Lunar, LunarUtil, LunarYear */
 const form = document.getElementById('chart-form');
 const error = document.getElementById('error');
 const result = document.getElementById('result');
@@ -11,6 +11,10 @@ let selectedLuckIndex = null;
 let selectedYearIndex = null;
 let showTaiYuan = false;
 let homeNowData = null;
+let fourSelections = [];
+let fourYearRecords = [];
+let fourOptions = [];
+let selectedFourCandidate = null;
 const birthSheet = document.getElementById('birth-sheet');
 const fourSheet = document.getElementById('four-sheet');
 const displaySheet = document.getElementById('display-sheet');
@@ -26,12 +30,91 @@ function showScreen(name) {
 function updateBirthSummary() {
   const ids = ['year', 'month', 'day', 'hour', 'minute'];
   const [year, month, day, hour, minute] = ids.map(id => document.getElementById(id).value.padStart(2, '0'));
-  document.getElementById('birth-summary').textContent = `${calendarType.value === 'lunar' ? '农历 ' : ''}${year}-${month}-${day} ${hour}:${minute}`;
+  if (calendarType.value === 'lunar') {
+    const monthName = document.getElementById('leap').checked ? `闰${lunarMonths[Number(month) - 1]}` : lunarMonths[Number(month) - 1];
+    document.getElementById('birth-summary').textContent = `农历 ${year}年${monthName || `${month}月`}${lunarDayName(day)} ${hour}:${minute}`;
+  } else document.getElementById('birth-summary').textContent = `${year}-${month}-${day} ${hour}:${minute}`;
+}
+const lunarMonths = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
+function lunarDayName(day) {
+  const n = Number(day); const digits = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  if (n === 10) return '初十'; if (n === 20) return '二十'; if (n === 30) return '三十';
+  return `${n < 10 ? '初' : n < 20 ? '十' : n < 30 ? '廿' : '三'}${digits[(n - 1) % 10]}`;
+}
+function renderWheel(type, options, selected) {
+  const wheel = document.querySelector(`[data-wheel="${type}"]`);
+  wheel.replaceChildren(); wheel.dataset.selected = String(selected);
+  wheel.append(make('span', 'wheel-spacer'));
+  for (const option of options) {
+    const button = make('button', 'wheel-option', option.label);
+    button.type = 'button'; button.dataset.value = String(option.value);
+    button.setAttribute('aria-pressed', String(String(option.value) === String(selected)));
+    wheel.append(button);
+  }
+  wheel.append(make('span', 'wheel-spacer'));
+  wheel.onscroll = () => {
+    clearTimeout(wheel._scrollTimer);
+    wheel._scrollTimer = setTimeout(() => {
+    const index = Math.max(0, Math.min(options.length - 1, Math.round(wheel.scrollTop / 36)));
+    const option = options[index]; if (!option) return;
+    if (wheel.dataset.selected === String(option.value)) return;
+    wheel.dataset.selected = String(option.value);
+    for (const button of wheel.querySelectorAll('.wheel-option')) button.setAttribute('aria-pressed', String(button.dataset.value === String(option.value)));
+    if (type === 'year') { document.getElementById('year').value = option.value; updateLunarMonthWheel(); }
+    if (type === 'month') { document.getElementById('month').value = Math.abs(option.value); document.getElementById('leap').checked = Number(option.value) < 0; }
+    if (type === 'day') document.getElementById('day').value = option.value;
+    if (type === 'hour') document.getElementById('hour').value = option.value;
+    if (type === 'minute') document.getElementById('minute').value = option.value;
+    if (type === 'month') updateLunarDayWheel();
+    updateBirthSummary();
+    }, 90);
+  };
+  const index = options.findIndex(option => String(option.value) === String(selected));
+  wheel.scrollTop = Math.max(0, index) * 36;
+}
+function updateLunarDayWheel() {
+  const y = Number(document.getElementById('year').value) || 2000;
+  const m = Number(document.getElementById('month').value) || 1;
+  const leap = document.getElementById('leap').checked;
+  const signedMonth = leap ? -m : m;
+  const month = LunarYear.fromYear(y).getMonth(signedMonth);
+  const count = month ? month.getDayCount() : 30;
+  const day = Math.min(Number(document.getElementById('day').value) || 1, count);
+  document.getElementById('day').value = day;
+  renderWheel('day', Array.from({ length: count }, (_, i) => ({ value: i + 1, label: lunarDayName(i + 1) })), day);
+}
+function updateLunarWheels() {
+  const y = Number(document.getElementById('year').value) || 2000;
+  const years = Array.from({ length: 299 }, (_, i) => 1801 + i).map(value => ({ value, label: String(value) }));
+  renderWheel('year', years, y);
+  updateLunarMonthWheel();
+  renderWheel('hour', Array.from({ length: 24 }, (_, i) => ({ value: i, label: String(i).padStart(2, '0') })), Number(document.getElementById('hour').value) || 0);
+  renderWheel('minute', Array.from({ length: 60 }, (_, i) => ({ value: i, label: String(i).padStart(2, '0') })), Number(document.getElementById('minute').value) || 0);
+}
+function updateLunarMonthWheel() {
+  const y = Number(document.getElementById('year').value) || 2000;
+  const months = LunarYear.fromYear(y).getMonths().map(month => {
+    const value = month.getMonth(); const name = lunarMonths[Math.abs(value) - 1] || '腊月';
+    return { value, label: value < 0 ? `闰${name}` : name };
+  });
+  const currentMonth = document.getElementById('leap').checked ? -Number(document.getElementById('month').value) : Number(document.getElementById('month').value);
+  const selectedMonth = months.some(month => month.value === currentMonth) ? currentMonth : Number(document.getElementById('month').value) || 1;
+  if (selectedMonth < 0) document.getElementById('leap').checked = true;
+  else document.getElementById('leap').checked = false;
+  renderWheel('month', months, selectedMonth);
+  updateLunarDayWheel();
+}
+function syncBirthPanel() {
+  const lunar = calendarType.value === 'lunar';
+  document.getElementById('solar-input-panel').hidden = lunar;
+  document.querySelector('.date-fields').hidden = lunar;
+  document.getElementById('lunar-wheel-panel').hidden = !lunar;
+  if (lunar) updateLunarWheels();
+  updateBirthSummary();
 }
 function syncCalendarButtons() {
   for (const button of document.querySelectorAll('[data-calendar]')) button.setAttribute('aria-pressed', String(button.dataset.calendar === calendarType.value));
-  document.getElementById('leap-wrap').classList.toggle('hidden', calendarType.value !== 'lunar');
-  updateBirthSummary();
+  syncBirthPanel();
 }
 function switchCalendar(next) {
   if (next === calendarType.value) return;
@@ -67,17 +150,39 @@ document.querySelector('.entry-choice-row').addEventListener('click', event => {
     for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button === sex));
   }
   const calendar = event.target.closest('[data-calendar]');
-  if (calendar?.dataset.calendar === 'four') { fourSheet.showModal(); return; }
+  if (calendar?.dataset.calendar === 'four') { renderFourInput(); fourSheet.showModal(); return; }
   if (calendar) switchCalendar(calendar.dataset.calendar);
 });
-document.getElementById('birth-trigger').addEventListener('click', () => birthSheet.showModal());
+document.getElementById('birth-trigger').addEventListener('click', () => { syncBirthPanel(); birthSheet.showModal(); if (calendarType.value === 'lunar') requestAnimationFrame(updateLunarWheels); });
 document.getElementById('birth-close').addEventListener('click', () => { updateBirthSummary(); birthSheet.close(); });
 document.getElementById('birth-confirm').addEventListener('click', () => {
   const dateError = document.getElementById('date-error');
   try { calculate(); dateError.hidden = true; updateBirthSummary(); birthSheet.close(); }
   catch (exception) { dateError.textContent = exception.message; dateError.hidden = false; }
 });
+document.getElementById('four-confirm').addEventListener('click', confirmFourPillars);
 document.getElementById('four-close').addEventListener('click', () => fourSheet.close());
+document.getElementById('four-clear').addEventListener('click', clearFourPillars);
+document.getElementById('four-options').addEventListener('click', event => {
+  const option = event.target.closest('[data-four-value]'); if (!option) return;
+  selectFourPillar(option.dataset.fourValue);
+});
+document.getElementById('four-candidate-list').addEventListener('click', event => {
+  const option = event.target.closest('[data-candidate-index]'); if (!option) return;
+  selectedFourCandidate = fourOptions[Number(option.dataset.candidateIndex)]; renderFourInput();
+});
+document.getElementById('four-slots').addEventListener('click', event => {
+  const slot = event.target.closest('[data-four-slot]'); if (!slot) return;
+  fourSelections = fourSelections.slice(0, Number(slot.dataset.fourSlot));
+  fourOptions = []; selectedFourCandidate = null; renderFourInput();
+});
+document.getElementById('shortcut-confirm').addEventListener('click', fillSolarShortcut);
+document.getElementById('birth-shortcut').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); fillSolarShortcut(); } });
+document.getElementById('summer-help').addEventListener('click', () => { const hint = document.getElementById('summer-hint'); hint.hidden = !hint.hidden; });
+document.querySelectorAll('.lunar-wheel').forEach(wheel => wheel.addEventListener('click', event => {
+  const option = event.target.closest('.wheel-option'); if (!option) return;
+  const index = [...wheel.querySelectorAll('.wheel-option')].indexOf(option); wheel.scrollTo({ top: index * 36, behavior: 'smooth' });
+}));
 document.getElementById('display-trigger').addEventListener('click', () => displaySheet.showModal());
 document.getElementById('display-close').addEventListener('click', () => displaySheet.close());
 
@@ -124,6 +229,152 @@ function beijingNow() {
 function validDate(y, m, d) {
   const date = new Date(y, m - 1, d);
   return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}
+function fillSolarShortcut() {
+  const errorNode = document.getElementById('date-error');
+  const digits = document.getElementById('birth-shortcut').value.trim().replace(/\D/g, '');
+  if (!/^\d{12}$/.test(digits)) { errorNode.textContent = '请输入 12 位出生时间，例如 20030506.0720。'; errorNode.hidden = false; return; }
+  const values = { year: digits.slice(0, 4), month: digits.slice(4, 6), day: digits.slice(6, 8), hour: digits.slice(8, 10), minute: digits.slice(10, 12) };
+  for (const [id, value] of Object.entries(values)) document.getElementById(id).value = value;
+  calendarType.value = 'solar'; document.getElementById('leap').checked = false; syncCalendarButtons();
+  try { calculate(); errorNode.hidden = true; updateBirthSummary(); }
+  catch (error) { errorNode.textContent = error.message; errorNode.hidden = false; }
+}
+function chinaSummerTime(solar) {
+  const ranges = { 1986: [5, 4, 9, 14], 1987: [4, 12, 9, 13], 1988: [4, 10, 9, 11], 1989: [4, 16, 9, 17], 1990: [4, 15, 9, 16], 1991: [4, 14, 9, 15] };
+  const range = ranges[solar.getYear()]; if (!range) return false;
+  const value = (((solar.getMonth() * 32 + solar.getDay()) * 24 + solar.getHour()) * 60 + solar.getMinute());
+  const start = (((range[0] * 32 + range[1]) * 24 + 3) * 60);
+  const end = (((range[2] * 32 + range[3]) * 24 + 3) * 60);
+  return value >= start && value < end;
+}
+function solarFromMillis(millis) {
+  const date = new Date(millis);
+  return Solar.fromYmdHms(date.getUTCFullYear(), date.getUTCMonth() + 1, date.getUTCDate(), date.getUTCHours(), date.getUTCMinutes(), 0);
+}
+function fourPillarsAt(y, m, d, h, minute = 30) {
+  const solar = Solar.fromYmdHms(y, m, d, h, minute, 0), lunar = solar.getLunar(), eight = lunar.getEightChar();
+  eight.setSect(document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  ApkTerms.correctPillars(lunar, eight, solarMillis(solar));
+  return ['Year', 'Month', 'Day', 'Time'].map(key => eight[`get${key}`]());
+}
+function unique(list) { return [...new Set(list)]; }
+function buildFourYearRecords(yearPillar) {
+  const minYear = 1801, maxYear = 2099, candidateYears = [];
+  for (let y = minYear; y <= maxYear; y++) if (fourPillarsAt(y, 7, 1, 12)[0] === yearPillar) candidateYears.push(y);
+  const records = [], seen = new Set(), termProbes = new Map();
+  for (const baseYear of candidateYears) for (const calendarYear of [baseYear, Math.min(maxYear, baseYear + 1)]) {
+    for (const term of ApkTerms.termsForCalendarYear(calendarYear).filter(item => item.index % 2 === 1)) {
+      const at = new Date(term.time), key = `${at.getUTCFullYear()}-${at.getUTCMonth() + 1}-${at.getUTCDate()}`;
+      if (at.getUTCFullYear() < minYear || at.getUTCFullYear() > maxYear) continue;
+      if (!termProbes.has(key)) termProbes.set(key, []);
+      const minute = at.getUTCMinutes();
+      termProbes.get(key).push([at.getUTCHours(), minute], [at.getUTCHours(), minute + 1]);
+    }
+  }
+  for (const baseYear of candidateYears) {
+    for (let y = baseYear; y <= Math.min(maxYear, baseYear + 1); y++) {
+      const days = new Date(Date.UTC(y, 1, 29)).getUTCMonth() === 1 ? 366 : 365;
+      for (let doy = 0; doy < days; doy++) {
+        const date = new Date(Date.UTC(y, 0, 1 + doy));
+        const year = date.getUTCFullYear(), month = date.getUTCMonth() + 1, day = date.getUTCDate();
+        const dateKey = `${year}-${month}-${day}`;
+        const probes = [...[[0, 30], [12, 30], [23, 30]], ...(termProbes.get(dateKey) || [])];
+        const probeKeys = new Set();
+        for (const [hourRaw, minuteRaw] of probes) {
+          const time = new Date(Date.UTC(year, month - 1, day, hourRaw, minuteRaw));
+          const hour = time.getUTCHours(), minute = time.getUTCMinutes();
+          const probeKey = `${hour}:${minute}`; if (probeKeys.has(probeKey)) continue; probeKeys.add(probeKey);
+          const pillars = fourPillarsAt(year, month, day, hour, minute);
+          if (pillars[0] !== yearPillar) continue;
+          const key = `${year}-${month}-${day}-${hour}-${pillars[1]}-${pillars[2]}`;
+          if (seen.has(key)) continue;
+          seen.add(key); records.push({ year, month, day, hour, minute, pillars });
+        }
+      }
+    }
+  }
+  return records;
+}
+function fourHourCandidates(dayPillar, monthPillar, yearPillar, targetHour = null) {
+  const dates = unique(fourYearRecords.filter(record => record.pillars[0] === yearPillar && record.pillars[1] === monthPillar && record.pillars[2] === dayPillar).map(record => `${record.year}-${record.month}-${record.day}`));
+  const candidates = [], seen = new Set();
+  for (const key of dates) {
+    const [y, m, d] = key.split('-').map(Number);
+    for (const hour of [0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]) {
+      const pillars = fourPillarsAt(y, m, d, hour, 30);
+      if (pillars[0] !== yearPillar || pillars[1] !== monthPillar || pillars[2] !== dayPillar) continue;
+      const candidate = { year: y, month: m, day: d, hour, minute: 30, pillars };
+      if ((targetHour == null || pillars[3] === targetHour) && !seen.has(`${y}-${m}-${d}-${hour}`)) { seen.add(`${y}-${m}-${d}-${hour}`); candidates.push(candidate); }
+    }
+  }
+  return candidates;
+}
+function allGanzhi() {
+  const stems = '甲乙丙丁戊己庚辛壬癸', branches = '子丑寅卯辰巳午未申酉戌亥';
+  return Array.from({ length: 60 }, (_, index) => `${stems[index % 10]}${branches[index % 12]}`);
+}
+function renderFourInput() {
+  const slots = document.getElementById('four-slots'); slots.replaceChildren();
+  const labels = ['年柱', '月柱', '日柱', '时柱'];
+  for (let i = 0; i < 4; i++) {
+    const button = make('button', `four-slot${fourSelections[i] ? ' filled' : ''}`, fourSelections[i] || '选择');
+    button.type = 'button'; button.dataset.fourSlot = String(i); button.setAttribute('aria-label', `${labels[i]}${fourSelections[i] ? ` ${fourSelections[i]}` : '，点击选择'}`);
+    slots.append(button);
+  }
+  const options = document.getElementById('four-options'), candidatesPanel = document.getElementById('four-candidates');
+  candidatesPanel.hidden = fourSelections.length !== 4;
+  options.replaceChildren();
+  let choices = [];
+  if (!fourSelections.length) choices = allGanzhi();
+  else if (fourSelections.length === 1) choices = unique(fourYearRecords.map(record => record.pillars[1]));
+  else if (fourSelections.length === 2) choices = unique(fourYearRecords.filter(record => record.pillars[1] === fourSelections[1]).map(record => record.pillars[2]));
+  else if (fourSelections.length === 3) choices = unique(fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0]).map(candidate => candidate.pillars[3]));
+  else choices = fourOptions.map(candidate => candidate.pillars[3]);
+  if (fourSelections.length === 4) choices = [];
+  for (const value of choices) {
+    const button = make('button', 'four-option', ''); button.type = 'button'; button.dataset.fourValue = value;
+    button.append(colored(value[0]), colored(value[1])); options.append(button);
+  }
+  if (fourSelections.length === 4) {
+    const list = document.getElementById('four-candidate-list'); list.replaceChildren();
+    fourOptions.forEach((candidate, index) => {
+      const text = `${candidate.year}年${String(candidate.month).padStart(2, '0')}月${String(candidate.day).padStart(2, '0')}日 ${String(candidate.hour).padStart(2, '0')}:30`;
+      const button = make('button', `four-candidate${candidate === selectedFourCandidate ? ' selected' : ''}`, text);
+      button.type = 'button'; button.dataset.candidateIndex = String(index); list.append(button);
+    });
+    document.getElementById('four-hint').textContent = fourOptions.length ? `找到 ${fourOptions.length} 个真实日期时刻；分钟先按 30 分钟填入，可按实际出生资料调整。` : '没有匹配结果，请返回修改前面的干支。';
+    document.getElementById('four-confirm').disabled = !selectedFourCandidate;
+  } else {
+    document.getElementById('four-hint').textContent = fourSelections.length ? `已按历法筛出 ${choices.length} 个下一柱选项。` : '先选年柱；后续选项会按真实历法日期筛选。';
+    document.getElementById('four-confirm').disabled = true;
+  }
+}
+function clearFourPillars() {
+  fourSelections = []; fourYearRecords = []; fourOptions = []; selectedFourCandidate = null;
+  document.getElementById('four-error').hidden = true; renderFourInput();
+}
+function selectFourPillar(value) {
+  const index = fourSelections.length;
+  if (!value) return;
+  if (index === 0) {
+    fourSelections = [value]; fourYearRecords = buildFourYearRecords(value); fourOptions = []; selectedFourCandidate = null;
+  } else if (index < 3) {
+    fourSelections.push(value); selectedFourCandidate = null;
+  } else if (index === 3) {
+    fourSelections.push(value);
+    fourOptions = fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0], value);
+    selectedFourCandidate = fourOptions.length === 1 ? fourOptions[0] : null;
+  }
+  document.getElementById('four-error').hidden = true; renderFourInput();
+}
+function confirmFourPillars() {
+  if (!selectedFourCandidate) return;
+  const c = selectedFourCandidate, minute = Number(document.getElementById('four-minute').value);
+  if (!Number.isInteger(minute) || minute < 0 || minute > 59) { document.getElementById('four-error').textContent = '出生分钟请输入 0—59。'; document.getElementById('four-error').hidden = false; return; }
+  calendarType.value = 'solar';
+  for (const [id, value] of Object.entries({ year: c.year, month: c.month, day: c.day, hour: c.hour, minute })) document.getElementById(id).value = value;
+  document.getElementById('summer-time').checked = false; syncCalendarButtons(); fourSheet.close(); render(calculate());
 }
 function safeText(item) { return String(item == null ? '' : item); }
 function solarMillis(solar) { return Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay(), solar.getHour(), solar.getMinute(), solar.getSecond()); }
@@ -190,7 +441,7 @@ function buildLuck(yun, solar, birthPillarYear, offset, mode) {
 function calculate() {
   const y = number('year'), m = number('month'), d = number('day');
   const h = number('hour'), minute = number('minute');
-  if (![y, m, d, h, minute].every(Number.isInteger) || y < 1901 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31 || h < 0 || h > 23 || minute < 0 || minute > 59) throw new Error('请填写 1901—2099 年内的完整出生时间。');
+  if (![y, m, d, h, minute].every(Number.isInteger) || y < 1801 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31 || h < 0 || h > 23 || minute < 0 || minute > 59) throw new Error('请填写 1801—2099 年内的完整出生时间。');
   let solar;
   if (calendarType.value === 'lunar') {
     const lunarMonth = document.getElementById('leap').checked ? -m : m;
@@ -200,6 +451,12 @@ function calculate() {
   } else {
     if (!validDate(y, m, d)) throw new Error('公历日期不存在，请检查年月日。');
     solar = Solar.fromYmdHms(y, m, d, h, minute, 0);
+  }
+  const inputSolar = solar;
+  const summerTime = document.getElementById('summer-time').checked;
+  if (summerTime) {
+    if (!chinaSummerTime(solar)) throw new Error('此时间不在排盘宝支持的夏令时阶段（中国大陆 1986—1991 年），请关闭夏令时或核对出生资料。');
+    solar = solarFromMillis(solarMillis(solar) - 3600000);
   }
   const lunar = solar.getLunar();
   const eight = lunar.getEightChar();
@@ -229,7 +486,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
+  return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name') };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -470,9 +727,10 @@ function render(data) {
   const jieTime = `${jie.getUTCFullYear()}年${String(jie.getUTCMonth() + 1).padStart(2, '0')}月${String(jie.getUTCDate()).padStart(2, '0')}日 ${String(jie.getUTCHours()).padStart(2, '0')}:${String(jie.getUTCMinutes()).padStart(2, '0')}`;
   document.getElementById('result-qian-kun').textContent = data.gender === 1 ? '乾' : '坤';
   document.getElementById('result-lunar').textContent = `农历：${data.lunar.toString()}`;
-  document.getElementById('result-date').textContent = `阳历：${solarTime}`;
+  const inputSolarTime = `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`;
+  document.getElementById('result-date').textContent = `阳历：${solarTime}${data.summerTime ? `（夏令时校正，原输入 ${inputSolarTime}）` : ''}`;
   document.getElementById('term-prior').textContent = `${data.priorJie.name}：${jieTime}`;
-  document.getElementById('term-birth').textContent = `出生：${solarTimeChinese}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
+  document.getElementById('term-birth').textContent = `出生：${solarTimeChinese}${data.summerTime ? '（夏令时校正后）' : ''}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
   selectedLuckIndex = null; selectedYearIndex = null;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
   document.getElementById('chart-empty').hidden = true;
@@ -488,7 +746,7 @@ document.getElementById('use-now').addEventListener('click', () => {
   const now = beijingNow();
   calendarType.value = 'solar'; syncCalendarButtons();
   document.getElementById('leap').checked = false;
-  document.getElementById('leap-wrap').classList.add('hidden');
+  document.getElementById('summer-time').checked = false;
   for (const [id, part] of Object.entries(now)) document.getElementById(id).value = part;
   updateBirthSummary();
   nowStatus.textContent = `已填入北京时间：${now.year}-${now.month}-${now.day} ${now.hour}:${now.minute}`;

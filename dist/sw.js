@@ -1,4 +1,4 @@
-const CACHE = 'bazi-preview-22';
+const CACHE = 'bazi-preview-23';
 const ASSETS = ['./', './index.html', './style.css', './app.js', './shen-sha.js', './lunar.js', './apk-terms-data.js', './apk-terms.js', './manifest.webmanifest', './icon.svg'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
