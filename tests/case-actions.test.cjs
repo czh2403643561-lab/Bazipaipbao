@@ -19,7 +19,8 @@ const records = new Map();
 const CaseStore = { async list() { return [...records.values()]; }, async get(id) { return records.get(id); },
   async put(record) { records.set(record.id, record); },
   async putMany(batch) { for (const record of batch) records.set(record.id, record); return batch.length; },
-  async remove(id) { records.delete(id); } };
+  async remove(id) { records.delete(id); },
+  async removeMany(ids) { for (const id of new Set(ids)) records.delete(id); return new Set(ids).size; } };
 const context = { Solar, Lunar, ApkTerms: global.ApkTerms, ApkShenSha: global.ApkShenSha,
   CaseStore, document, navigator: {}, location: { protocol: 'file:' }, Intl, Date, Math, Number, String, Array, Object, Error, console };
 context.window = context;
@@ -60,5 +61,10 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal(restored.display.pillars.length, 4);
   assert.equal((await context.CaseActions.remove(restored.id)).id, restored.id);
   assert.equal(records.size, 1);
+  const remaining = [...records.values()][0];
+  const removed = await context.CaseActions.removeMany([remaining.id, remaining.id]);
+  assert.equal(removed.length, 1, 'batch removal deduplicates selected ids');
+  assert.equal(records.size, 0, 'batch removal deletes selected records');
+  await assert.rejects(context.CaseActions.removeMany([]), /请先选择/);
   console.log('案例批量预览、查重、保存、筛选、修改、备份恢复和删除：通过');
 })().catch(error => { console.error(error); process.exitCode = 1; });

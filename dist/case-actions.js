@@ -149,6 +149,14 @@ window.CaseActions = (() => {
     await CaseStore.remove(id);
     return existing;
   }
+  async function removeMany(ids) {
+    const uniqueIds = [...new Set(ids.map(String).filter(Boolean))];
+    if (!uniqueIds.length) throw new Error('请先选择要删除的案例');
+    const records = await Promise.all(uniqueIds.map(id => CaseStore.get(id)));
+    if (records.some(record => !record)) throw new Error('所选案例已发生变化，请刷新后重试');
+    await CaseStore.removeMany(uniqueIds);
+    return records;
+  }
   async function exportBackup() {
     return JSON.stringify({ format: 'bazi-case-backup', version: 1, exportedAt: new Date().toISOString(), cases: await CaseStore.list() }, null, 2);
   }
@@ -211,5 +219,5 @@ window.CaseActions = (() => {
         && (!from || display.solar.slice(0, 10) >= from) && (!to || display.solar.slice(0, 10) <= to);
     });
   }
-  return { normalize, search, previewImport, commitImport, previewRestore, commitRestore, exportBackup, saveCalculated, update, remove };
+  return { normalize, search, previewImport, commitImport, previewRestore, commitRestore, exportBackup, saveCalculated, update, remove, removeMany };
 })();

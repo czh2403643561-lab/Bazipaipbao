@@ -50,13 +50,13 @@
         <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="taiyuan-toggle" class="taiyuan-toggle" type="button" aria-pressed="false">胎元 关</button><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div><p id="case-save-feedback" class="case-save-feedback" role="status" hidden></p>
         <div class="result-birth"><strong id="result-qian-kun"></strong><span id="result-lunar"></span><span id="result-date"></span></div>
         <div class="term-brief"><div id="term-prior"></div><div id="term-birth"></div></div>
-        <div class="mode-tabs" aria-label="排盘显示方式"><button data-mode="traditional" type="button">传统排盘</button><button data-mode="fullscreen" type="button">全盘</button><button data-mode="simple" type="button">精简</button></div>
+        <div class="mode-tabs" aria-label="排盘显示方式"><button data-mode="traditional" type="button">传统排盘</button><button data-mode="simple" type="button">精简</button></div>
         <div id="mode-output"></div>
         <p class="note">仅提供排盘数据；部分神煞结果仍在对照原版。</p>
       </section>
     </section>
     <section id="cases-screen" class="app-screen cases-screen" aria-label="案例" hidden>
-      <div class="cases-top"><strong>我的案例</strong><span>保存在此设备</span></div>
+      <div class="cases-top"><div class="cases-title"><strong>我的案例</strong><span>保存在此设备</span></div><div class="case-selection-tools"><button id="case-delete-mode" type="button">删除</button><button id="case-delete-cancel" type="button" hidden>取消</button><button id="case-delete-confirm" type="button" disabled hidden>删除所选（0）</button></div></div>
       <div class="case-backup-tools"><button id="case-backup-export" type="button">导出备份</button><button id="case-backup-restore-open" type="button">恢复备份</button><input id="case-backup-file" type="file" accept=".json,application/json" hidden></div>
       <div class="case-search"><span aria-hidden="true">⌕</span><input id="case-search-input" type="search" placeholder="搜索姓名、日期或干支" aria-label="搜索案例"></div>
       <div class="case-tools"><label>性别<select id="case-gender-filter"><option value="">全部</option><option value="1">男</option><option value="0">女</option></select></label><label>四柱<input id="case-pillar-filter" type="text" maxlength="2" placeholder="如 甲子" aria-label="按四柱干支筛选"></label><button id="case-import-open" type="button">批量导入</button></div>
@@ -104,6 +104,7 @@
     <p class="case-import-help">先检查备份内容，再确认恢复。重复案例和有问题的资料会跳过。</p><p id="case-restore-status" class="case-import-status" role="status"></p><div id="case-restore-preview" class="case-import-preview"></div>
     <div class="case-import-actions"><button id="case-restore-confirm" type="button" disabled>确认恢复</button></div>
   </dialog>
+  <dialog id="case-delete-sheet" class="sheet-dialog case-delete-sheet"><div class="sheet-head"><h2>确认删除案例</h2><button id="case-delete-close" type="button" aria-label="关闭">×</button></div><p id="case-delete-summary" class="case-import-help"></p><div class="case-import-actions"><button id="case-delete-dismiss" type="button">取消</button><button id="case-delete-commit" type="button">确认删除</button></div></dialog>
   <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script><script src="case-actions.js"></script>
 </body>
 </html>

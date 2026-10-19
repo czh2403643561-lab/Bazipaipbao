@@ -793,20 +793,18 @@ function renderSimple(data) {
   summary.append(make('span', '', '起运'), make('strong', '', `${data.offset.years}年${data.offset.months}个月${data.offset.days}天`));
   fragment.append(summary, renderLuck(data)); return fragment;
 }
-function renderFullscreen(data) {
-  return renderTraditional(data);
-}
 function renderMode(data, mode) {
+  if (mode !== 'traditional' && mode !== 'simple') mode = 'traditional';
+  activeMode = mode;
   modeOutput.replaceChildren();
   for (const tab of document.querySelectorAll('[data-mode]')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
   const taiToggle = document.getElementById('taiyuan-toggle');
   taiToggle.hidden = mode === 'simple';
   taiToggle.textContent = `胎元 ${showTaiYuan ? '开' : '关'}`;
   taiToggle.setAttribute('aria-pressed', String(showTaiYuan));
-  const titles = { traditional: '传统排盘', fullscreen: '全盘', simple: '精简排盘' };
+  const titles = { traditional: '传统排盘', simple: '精简排盘' };
   document.getElementById('result-title').textContent = titles[mode];
   if (mode === 'traditional') modeOutput.append(renderTraditional(data));
-  else if (mode === 'fullscreen') modeOutput.append(renderFullscreen(data));
   else modeOutput.append(renderSimple(data));
 }
 function render(data) {
@@ -852,6 +850,19 @@ function showCaseSaveError(error) {
 async function saveCurrentCase(data) {
   await CaseActions.saveCalculated(data);
 }
+let caseDeleteMode = false;
+const selectedCaseIds = new Set();
+function syncCaseDeleteControls() {
+  const count = selectedCaseIds.size;
+  document.getElementById('cases-screen').classList.toggle('case-delete-mode', caseDeleteMode);
+  document.getElementById('case-delete-mode').hidden = caseDeleteMode;
+  document.getElementById('case-delete-cancel').hidden = !caseDeleteMode;
+  const confirm = document.getElementById('case-delete-confirm');
+  confirm.hidden = !caseDeleteMode;
+  confirm.disabled = count === 0;
+  confirm.textContent = `删除所选（${count}）`;
+}
+function clearCaseSelection() { selectedCaseIds.clear(); }
 async function refreshCases() {
   const list = document.getElementById('cases-list');
   const empty = document.getElementById('cases-empty');
@@ -864,27 +875,52 @@ async function refreshCases() {
     empty.textContent = query || document.getElementById('case-gender-filter').value || document.getElementById('case-pillar-filter').value
       ? '没有找到符合条件的案例' : '还没有收藏的案例\n打开首页“保存”，排盘后会自动收录';
     for (const item of records) {
-      const row = make('div', 'case-row'); row.dataset.caseId = item.id;
-      const details = make('span', 'case-details');
-      details.append(make('strong', '', item.display.name), make('span', '', item.display.gender === 1 ? '男' : '女'), make('small', '', item.display.solar));
+      const row = make('div', 'case-row'); row.dataset.caseId = item.id; row.tabIndex = 0; row.setAttribute('role', 'listitem'); row.setAttribute('aria-label', `打开${item.display.name}的排盘`);
+      const selector = make('button', 'case-selector'); selector.type = 'button'; selector.dataset.caseSelect = 'true';
+      selector.setAttribute('aria-label', `选择${item.display.name}`); selector.setAttribute('aria-pressed', String(selectedCaseIds.has(item.id)));
+      const details = make('div', 'case-details');
+      const nameLine = make('span', 'case-name-line');
+      nameLine.append(make('strong', '', item.display.name), make('span', 'case-gender', item.display.gender === 1 ? '男' : '女'));
+      const edit = make('button', 'case-edit-icon'); edit.type = 'button'; edit.dataset.caseEdit = 'true';
+      edit.setAttribute('aria-label', `编辑${item.display.name}`);
+      edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M13 3v6h6"/><path d="M8 13h3M8 17h2"/><path d="m14 16 5-5 2 2-5 5-3 1Z"/></svg>';
+      nameLine.append(edit);
+      details.append(nameLine, make('small', '', item.display.solar));
       const pillars = make('span', 'case-pillars');
       for (const part of [0, 1]) {
         const line = make('span', 'case-pillar-line');
         item.display.pillars.forEach(pillar => line.append(colored(pillar[part])));
         pillars.append(line);
       }
-      const actions = make('span', 'case-row-actions');
-      for (const [action, label] of [['open', '打开'], ['edit', '编辑'], ['delete', '删除']]) {
-        const button = make('button', '', label); button.type = 'button'; button.dataset.caseAction = action; button.setAttribute('aria-label', `${label}${item.display.name}`); actions.append(button);
-      }
-      row.append(details, pillars, actions); list.append(row);
+      row.append(selector, details, pillars); list.append(row);
     }
+    syncCaseDeleteControls();
     document.getElementById('cases-error').hidden = true;
   } catch (error) { showCaseSaveError(error); empty.hidden = false; }
 }
-document.getElementById('case-search-input').addEventListener('input', refreshCases);
-document.getElementById('case-gender-filter').addEventListener('change', refreshCases);
-document.getElementById('case-pillar-filter').addEventListener('input', refreshCases);
+for (const [id, type] of [['case-search-input', 'input'], ['case-gender-filter', 'change'], ['case-pillar-filter', 'input']]) {
+  document.getElementById(id).addEventListener(type, () => { clearCaseSelection(); refreshCases(); });
+}
+document.getElementById('case-delete-mode').addEventListener('click', () => { caseDeleteMode = true; clearCaseSelection(); refreshCases(); });
+document.getElementById('case-delete-cancel').addEventListener('click', () => { caseDeleteMode = false; clearCaseSelection(); refreshCases(); });
+const caseDeleteSheet = document.getElementById('case-delete-sheet');
+document.getElementById('case-delete-close').addEventListener('click', () => caseDeleteSheet.close());
+document.getElementById('case-delete-dismiss').addEventListener('click', () => caseDeleteSheet.close());
+document.getElementById('case-delete-confirm').addEventListener('click', async () => {
+  if (!selectedCaseIds.size) return;
+  const selected = await Promise.all([...selectedCaseIds].map(id => CaseStore.get(id)));
+  const names = selected.filter(Boolean).map(record => record.display.name);
+  document.getElementById('case-delete-summary').textContent = `确定删除 ${names.length} 个案例吗？${names.length ? `（${names.slice(0, 3).join('、')}${names.length > 3 ? '等' : ''}）` : ''} 删除后无法恢复。`;
+  caseDeleteSheet.showModal();
+});
+document.getElementById('case-delete-commit').addEventListener('click', async () => {
+  const commit = document.getElementById('case-delete-commit'); commit.disabled = true;
+  try {
+    await CaseActions.removeMany([...selectedCaseIds]);
+    caseDeleteSheet.close(); caseDeleteMode = false; clearCaseSelection(); await refreshCases();
+  } catch (error) { caseDeleteSheet.close(); showCaseSaveError(error); }
+  finally { commit.disabled = false; }
+});
 const caseImportSheet = document.getElementById('case-import-sheet');
 const caseImportText = document.getElementById('case-import-text');
 const caseImportStatus = document.getElementById('case-import-status');
@@ -967,15 +1003,9 @@ caseRestoreConfirm.addEventListener('click', async () => {
     await refreshCases();
   } catch (exception) { caseRestoreStatus.textContent = exception.message || '恢复失败'; }
 });
-document.getElementById('cases-list').addEventListener('click', async event => {
-  const button = event.target.closest('[data-case-action]'); if (!button) return;
-  const row = button.closest('[data-case-id]'); if (!row) return;
+async function useSavedCase(id, edit = false) {
   try {
-    const record = await CaseStore.get(row.dataset.caseId); if (!record) return;
-    if (button.dataset.caseAction === 'delete') {
-      if (!window.confirm(`确定删除“${record.display.name}”的案例吗？此操作无法撤销。`)) return;
-      await CaseActions.remove(record.id); await refreshCases(); return;
-    }
+    const record = await CaseStore.get(id); if (!record) return;
     const input = record.input;
     for (const field of ['name', 'gender', 'calendar', 'year', 'month', 'day', 'hour', 'minute', 'ziRule', 'yunMode']) {
       const ids = { name: 'chart-name', calendar: 'calendar-type', ziRule: 'zi-rule', yunMode: 'yun-mode' };
@@ -985,7 +1015,7 @@ document.getElementById('cases-list').addEventListener('click', async event => {
     document.getElementById('summer-time').checked = input.summerTime;
     for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button.dataset.gender === input.gender));
     syncCalendarButtons(); updateBirthSummary();
-    if (button.dataset.caseAction === 'edit') {
+    if (edit) {
       editingCaseId = record.id;
       document.getElementById('chart-submit').textContent = '保存案例修改';
       document.getElementById('cancel-case-edit').hidden = false;
@@ -996,6 +1026,24 @@ document.getElementById('cases-list').addEventListener('click', async event => {
     openingSavedCase = true; render(calculate());
   } catch (error) { showCaseSaveError(error); }
   finally { openingSavedCase = false; }
+}
+document.getElementById('cases-list').addEventListener('click', event => {
+  const row = event.target.closest('[data-case-id]'); if (!row) return;
+  if (caseDeleteMode) {
+    if (event.target.closest('[data-case-edit]')) return;
+    const id = row.dataset.caseId;
+    if (selectedCaseIds.has(id)) selectedCaseIds.delete(id); else selectedCaseIds.add(id);
+    row.querySelector('[data-case-select]').setAttribute('aria-pressed', String(selectedCaseIds.has(id)));
+    syncCaseDeleteControls(); return;
+  }
+  if (event.target.closest('[data-case-edit]')) { useSavedCase(row.dataset.caseId, true); return; }
+  useSavedCase(row.dataset.caseId);
+});
+document.getElementById('cases-list').addEventListener('keydown', event => {
+  if ((event.key !== 'Enter' && event.key !== ' ') || !event.target.matches('.case-row')) return;
+  const row = event.target;
+  event.preventDefault();
+  if (caseDeleteMode) row.click(); else useSavedCase(row.dataset.caseId);
 });
 autoSave.addEventListener('change', () => {
   try { localStorage.setItem('bazi-auto-save', autoSave.checked ? '1' : '0'); }

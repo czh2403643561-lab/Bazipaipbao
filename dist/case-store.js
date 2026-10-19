@@ -36,7 +36,20 @@ window.CaseStore = (() => {
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const get = id => transaction('readonly', store => store.get(id));
   const put = record => transaction('readwrite', store => store.put(record));
-  const remove = id => transaction('readwrite', store => store.delete(id));
+  const remove = id => removeMany([id]);
+  async function removeMany(ids) {
+    const uniqueIds = [...new Set(ids)];
+    if (!uniqueIds.length) return 0;
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cases', 'readwrite');
+      const store = tx.objectStore('cases');
+      for (const id of uniqueIds) store.delete(id);
+      tx.oncomplete = () => resolve(uniqueIds.length);
+      tx.onerror = () => reject(tx.error || new Error('批量删除失败'));
+      tx.onabort = () => reject(tx.error || new Error('批量删除失败'));
+    });
+  }
   async function putMany(records) {
     if (!records.length) return 0;
     const db = await open();
@@ -49,5 +62,5 @@ window.CaseStore = (() => {
       tx.onabort = () => reject(tx.error || new Error('批量保存失败'));
     });
   }
-  return { list, get, put, putMany, remove };
+  return { list, get, put, putMany, remove, removeMany };
 })();
