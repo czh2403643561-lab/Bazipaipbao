@@ -15,6 +15,10 @@ let fourSelections = [];
 let fourYearRecords = [];
 let fourOptions = [];
 let selectedFourCandidate = null;
+let fourEditIndex = 0;
+let fourPhase = 'stem';
+let fourPendingStem = '';
+let fourRecordZiRule = null;
 const birthSheet = document.getElementById('birth-sheet');
 const fourSheet = document.getElementById('four-sheet');
 const displaySheet = document.getElementById('display-sheet');
@@ -150,7 +154,10 @@ document.querySelector('.entry-choice-row').addEventListener('click', event => {
     for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button === sex));
   }
   const calendar = event.target.closest('[data-calendar]');
-  if (calendar?.dataset.calendar === 'four') { renderFourInput(); fourSheet.showModal(); return; }
+  if (calendar?.dataset.calendar === 'four') {
+    if (fourSelections.length && fourRecordZiRule !== document.getElementById('zi-rule').value) reconcileFourPillars(0);
+    renderFourInput(); fourSheet.showModal(); return;
+  }
   if (calendar) switchCalendar(calendar.dataset.calendar);
 });
 document.getElementById('birth-trigger').addEventListener('click', () => { syncBirthPanel(); birthSheet.showModal(); if (calendarType.value === 'lunar') requestAnimationFrame(updateLunarWheels); });
@@ -173,8 +180,7 @@ document.getElementById('four-candidate-list').addEventListener('click', event =
 });
 document.getElementById('four-slots').addEventListener('click', event => {
   const slot = event.target.closest('[data-four-slot]'); if (!slot) return;
-  fourSelections = fourSelections.slice(0, Number(slot.dataset.fourSlot));
-  fourOptions = []; selectedFourCandidate = null; renderFourInput();
+  editFourPillar(Number(slot.dataset.fourSlot), event.target.closest('[data-four-part]')?.dataset.fourPart);
 });
 document.getElementById('shortcut-confirm').addEventListener('click', fillSolarShortcut);
 document.getElementById('birth-shortcut').addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); fillSolarShortcut(); } });
@@ -296,85 +302,164 @@ function buildFourYearRecords(yearPillar) {
   }
   return records;
 }
+const fourStems = '甲乙丙丁戊己庚辛壬癸';
+const fourBranches = '子丑寅卯辰巳午未申酉戌亥';
+function allGanzhi() {
+  return Array.from({ length: 60 }, (_, index) => `${fourStems[index % 10]}${fourBranches[index % 12]}`);
+}
+function fourMonthPillars(yearStem) {
+  const first = { 甲: 2, 己: 2, 乙: 4, 庚: 4, 丙: 6, 辛: 6, 丁: 8, 壬: 8, 戊: 0, 癸: 0 }[yearStem];
+  return Array.from({ length: 12 }, (_, i) => `${fourStems[(first + i) % 10]}${fourBranches[(i + 2) % 12]}`);
+}
+function fourTimePillars(dayStem) {
+  const first = { 甲: 0, 己: 0, 乙: 2, 庚: 2, 丙: 4, 辛: 4, 丁: 6, 壬: 6, 戊: 8, 癸: 8 }[dayStem];
+  const pillars = Array.from({ length: 12 }, (_, i) => `${fourStems[(first + i) % 10]}${fourBranches[i]}`);
+  if (document.getElementById('zi-rule').value === '24') {
+    const nextStem = fourStems[(fourStems.indexOf(dayStem) + 1) % 10];
+    const lateZiStem = { 甲: '甲', 己: '甲', 乙: '丙', 庚: '丙', 丙: '戊', 辛: '戊', 丁: '庚', 壬: '庚', 戊: '壬', 癸: '壬' }[nextStem];
+    if (!pillars.includes(`${lateZiStem}子`)) pillars.push(`${lateZiStem}子`);
+  }
+  return pillars;
+}
+function fourMonthChoices() {
+  const available = new Set(fourYearRecords.map(record => record.pillars[1]));
+  return fourMonthPillars(fourSelections[0][0]).filter(pillar => available.has(pillar));
+}
+function fourDayChoices() {
+  return unique(fourYearRecords.filter(record => record.pillars[1] === fourSelections[1]).map(record => record.pillars[2]));
+}
 function fourHourCandidates(dayPillar, monthPillar, yearPillar, targetHour = null) {
   const dates = unique(fourYearRecords.filter(record => record.pillars[0] === yearPillar && record.pillars[1] === monthPillar && record.pillars[2] === dayPillar).map(record => `${record.year}-${record.month}-${record.day}`));
-  const candidates = [], seen = new Set();
+  const hours = targetHour ? [targetHour] : fourTimePillars(dayPillar[0]);
+  const candidates = new Map(), termCache = new Map();
   for (const key of dates) {
     const [y, m, d] = key.split('-').map(Number);
-    for (const hour of [0, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19, 21, 23]) {
-      const pillars = fourPillarsAt(y, m, d, hour, 30);
-      if (pillars[0] !== yearPillar || pillars[1] !== monthPillar || pillars[2] !== dayPillar) continue;
-      const candidate = { year: y, month: m, day: d, hour, minute: 30, pillars };
-      if ((targetHour == null || pillars[3] === targetHour) && !seen.has(`${y}-${m}-${d}-${hour}`)) { seen.add(`${y}-${m}-${d}-${hour}`); candidates.push(candidate); }
+    if (!termCache.has(y)) termCache.set(y, ApkTerms.termsForCalendarYear(y).filter(term => term.index % 2 === 1));
+    for (const pillar of hours) {
+      const branchIndex = fourBranches.indexOf(pillar[1]);
+      const probes = pillar[1] === '子' ? [[0, 0], [23, 0]] : [[branchIndex * 2, 0]];
+      for (const term of termCache.get(y)) {
+        const at = new Date(term.time);
+        if (at.getUTCFullYear() !== y || at.getUTCMonth() + 1 !== m || at.getUTCDate() !== d) continue;
+        for (const delta of [-60000, 60000]) {
+          const near = new Date(at.getTime() + delta);
+          if (near.getUTCFullYear() === y && near.getUTCMonth() + 1 === m && near.getUTCDate() === d) probes.push([near.getUTCHours(), near.getUTCMinutes()]);
+        }
+      }
+      for (const [hour, minute] of probes) {
+        const actual = fourPillarsAt(y, m, d, hour, minute);
+        if (actual[0] !== yearPillar || actual[1] !== monthPillar || actual[2] !== dayPillar || actual[3] !== pillar) continue;
+        const interval = pillar[1] === '子' ? new Date(Date.UTC(y, m - 1, d, hour === 0 ? -1 : 23)) : new Date(Date.UTC(y, m - 1, d, branchIndex * 2 - 1));
+        const intervalKey = `${interval.toISOString()}-${pillar}`;
+        const next = { year: y, month: m, day: d, hour, minute, pillars: actual };
+        const previous = candidates.get(intervalKey);
+        if (!previous || (previous.minute !== 0 && minute === 0) || (pillar[1] === '子' && previous.hour === 23 && hour === 0)) candidates.set(intervalKey, next);
+      }
     }
   }
-  return candidates;
+  return [...candidates.values()].sort((a, b) => Date.UTC(b.year, b.month - 1, b.day, b.hour, b.minute) - Date.UTC(a.year, a.month - 1, a.day, a.hour, a.minute));
 }
-function allGanzhi() {
-  const stems = '甲乙丙丁戊己庚辛壬癸', branches = '子丑寅卯辰巳午未申酉戌亥';
-  return Array.from({ length: 60 }, (_, index) => `${stems[index % 10]}${branches[index % 12]}`);
+function fourTimeChoices() {
+  const available = new Set(fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0]).map(candidate => candidate.pillars[3]));
+  return fourTimePillars(fourSelections[2][0]).filter(pillar => available.has(pillar));
+}
+function reconcileFourPillars(changedIndex) {
+  if (changedIndex === 0) {
+    fourYearRecords = buildFourYearRecords(fourSelections[0]);
+    fourRecordZiRule = document.getElementById('zi-rule').value;
+  }
+  if (fourSelections[1] && !fourMonthChoices().includes(fourSelections[1])) fourSelections.length = 1;
+  if (fourSelections[2] && !fourDayChoices().includes(fourSelections[2])) fourSelections.length = 2;
+  if (fourSelections[3] && !fourTimeChoices().includes(fourSelections[3])) fourSelections.length = 3;
+  fourOptions = fourSelections.length === 4 ? fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0], fourSelections[3]) : [];
+  selectedFourCandidate = null;
+  fourEditIndex = fourSelections.length;
+  fourPhase = fourEditIndex === 0 || fourEditIndex === 2 ? 'stem' : 'pair';
+  fourPendingStem = '';
+}
+function editFourPillar(index, part) {
+  if (index > fourSelections.length || index > 0 && !fourSelections[index - 1]) return;
+  fourEditIndex = index;
+  fourPhase = index === 0 || index === 2 ? part === 'branch' && fourSelections[index] ? 'branch' : 'stem' : 'pair';
+  fourPendingStem = fourPhase === 'branch' ? fourSelections[index][0] : '';
+  document.getElementById('four-error').hidden = true;
+  renderFourInput();
 }
 function renderFourInput() {
   const slots = document.getElementById('four-slots'); slots.replaceChildren();
   const labels = ['年柱', '月柱', '日柱', '时柱'];
   for (let i = 0; i < 4; i++) {
-    const button = make('button', `four-slot${fourSelections[i] ? ' filled' : ''}`, fourSelections[i] || '选择');
-    button.type = 'button'; button.dataset.fourSlot = String(i); button.setAttribute('aria-label', `${labels[i]}${fourSelections[i] ? ` ${fourSelections[i]}` : '，点击选择'}`);
+    const pillar = i === fourEditIndex && fourPhase === 'branch' ? fourPendingStem : fourSelections[i] || '';
+    const button = make('button', `four-slot${pillar ? ' filled' : ''}${i === fourEditIndex ? ' active' : ''}`);
+    button.type = 'button'; button.dataset.fourSlot = String(i); button.setAttribute('aria-label', `${labels[i]}${pillar || '待选择'}，点击修改`);
+    for (const [part, char] of [['stem', pillar[0]], ['branch', pillar[1]]]) {
+      const orb = make('span', `four-orb${char ? ' chosen' : ''}${i === fourEditIndex && (fourPhase === part || fourPhase === 'pair') ? ' picking' : ''}`);
+      orb.dataset.fourPart = part;
+      if (char) orb.append(colored(char));
+      button.append(orb);
+    }
     slots.append(button);
   }
-  const options = document.getElementById('four-options'), candidatesPanel = document.getElementById('four-candidates');
-  candidatesPanel.hidden = fourSelections.length !== 4;
-  options.replaceChildren();
+  const options = document.getElementById('four-options'), panel = document.getElementById('four-candidates');
+  const finished = fourEditIndex === 4 && fourSelections.length === 4;
+  options.hidden = finished; panel.hidden = !finished; options.replaceChildren();
   let choices = [];
-  if (!fourSelections.length) choices = allGanzhi();
-  else if (fourSelections.length === 1) choices = unique(fourYearRecords.map(record => record.pillars[1]));
-  else if (fourSelections.length === 2) choices = unique(fourYearRecords.filter(record => record.pillars[1] === fourSelections[1]).map(record => record.pillars[2]));
-  else if (fourSelections.length === 3) choices = unique(fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0]).map(candidate => candidate.pillars[3]));
-  else choices = fourOptions.map(candidate => candidate.pillars[3]);
-  if (fourSelections.length === 4) choices = [];
-  for (const value of choices) {
-    const button = make('button', 'four-option', ''); button.type = 'button'; button.dataset.fourValue = value;
-    button.append(colored(value[0]), colored(value[1])); options.append(button);
+  if (!finished) {
+    if (fourPhase === 'stem') choices = [...fourStems];
+    else if (fourPhase === 'branch') {
+      const available = fourEditIndex === 0 ? allGanzhi() : fourDayChoices();
+      choices = unique(available.filter(pillar => pillar[0] === fourPendingStem).map(pillar => pillar[1]));
+    } else if (fourEditIndex === 1) choices = fourMonthChoices();
+    else if (fourEditIndex === 3) choices = fourTimeChoices();
+    options.dataset.layout = fourPhase === 'branch' ? 'branches' : 'grid';
+    for (const value of choices) {
+      const button = make('button', 'four-option'); button.type = 'button'; button.dataset.fourValue = value;
+      for (const character of value) button.append(colored(character));
+      options.append(button);
+    }
   }
-  if (fourSelections.length === 4) {
+  if (finished) {
     const list = document.getElementById('four-candidate-list'); list.replaceChildren();
     fourOptions.forEach((candidate, index) => {
-      const text = `${candidate.year}年${String(candidate.month).padStart(2, '0')}月${String(candidate.day).padStart(2, '0')}日 ${String(candidate.hour).padStart(2, '0')}:30`;
-      const button = make('button', `four-candidate${candidate === selectedFourCandidate ? ' selected' : ''}`, text);
-      button.type = 'button'; button.dataset.candidateIndex = String(index); list.append(button);
+      const solar = Solar.fromYmdHms(candidate.year, candidate.month, candidate.day, candidate.hour, candidate.minute, 0);
+      const lunar = solar.getLunar(), lunarMonth = lunar.getMonth();
+      const button = make('button', `four-candidate${candidate === selectedFourCandidate ? ' selected' : ''}`);
+      button.type = 'button'; button.dataset.candidateIndex = String(index);
+      button.append(make('span', 'four-candidate-solar', `阳历：${candidate.year}-${String(candidate.month).padStart(2, '0')}-${String(candidate.day).padStart(2, '0')} ${String(candidate.hour).padStart(2, '0')}:${String(candidate.minute).padStart(2, '0')}`));
+      button.append(make('span', 'four-candidate-lunar', `阴历：${lunar.getYear()}年${lunarMonth < 0 ? '闰' : ''}${lunarMonths[Math.abs(lunarMonth) - 1]}${lunarDayName(lunar.getDay())} ${candidate.pillars[3][1]}时`));
+      list.append(button);
     });
-    document.getElementById('four-hint').textContent = fourOptions.length ? `找到 ${fourOptions.length} 个真实日期时刻；分钟先按 30 分钟填入，可按实际出生资料调整。` : '没有匹配结果，请返回修改前面的干支。';
-    document.getElementById('four-confirm').disabled = !selectedFourCandidate;
+    document.getElementById('four-hint').textContent = fourOptions.length ? `找到 ${fourOptions.length} 个对应日期；点击其中一项后确定。` : '没有对应日期，请修改四柱。';
   } else {
-    document.getElementById('four-hint').textContent = fourSelections.length ? `已按历法筛出 ${choices.length} 个下一柱选项。` : '先选年柱；后续选项会按真实历法日期筛选。';
-    document.getElementById('four-confirm').disabled = true;
+    document.getElementById('four-hint').textContent = fourPhase === 'branch' ? `选择${fourEditIndex === 0 ? '年柱' : '日柱'}地支` : ['选择年柱天干', '选择月柱，一次点选完整干支', '选择日柱天干', '选择时柱，一次点选完整干支'][fourEditIndex];
   }
+  document.getElementById('four-confirm').disabled = !finished || !selectedFourCandidate;
 }
 function clearFourPillars() {
   fourSelections = []; fourYearRecords = []; fourOptions = []; selectedFourCandidate = null;
+  fourEditIndex = 0; fourPhase = 'stem'; fourPendingStem = ''; fourRecordZiRule = null;
   document.getElementById('four-error').hidden = true; renderFourInput();
 }
 function selectFourPillar(value) {
-  const index = fourSelections.length;
-  if (!value) return;
-  if (index === 0) {
-    fourSelections = [value]; fourYearRecords = buildFourYearRecords(value); fourOptions = []; selectedFourCandidate = null;
-  } else if (index < 3) {
-    fourSelections.push(value); selectedFourCandidate = null;
-  } else if (index === 3) {
-    fourSelections.push(value);
-    fourOptions = fourHourCandidates(fourSelections[2], fourSelections[1], fourSelections[0], value);
-    selectedFourCandidate = fourOptions.length === 1 ? fourOptions[0] : null;
+  if (!value || fourEditIndex > 3) return;
+  if (fourPhase === 'stem') {
+    fourPendingStem = value; fourPhase = 'branch'; renderFourInput(); return;
   }
+  fourSelections[fourEditIndex] = fourPhase === 'branch' ? `${fourPendingStem}${value}` : value;
+  reconcileFourPillars(fourEditIndex);
   document.getElementById('four-error').hidden = true; renderFourInput();
 }
 function confirmFourPillars() {
   if (!selectedFourCandidate) return;
-  const c = selectedFourCandidate, minute = Number(document.getElementById('four-minute').value);
-  if (!Number.isInteger(minute) || minute < 0 || minute > 59) { document.getElementById('four-error').textContent = '出生分钟请输入 0—59。'; document.getElementById('four-error').hidden = false; return; }
+  const c = selectedFourCandidate;
   calendarType.value = 'solar';
-  for (const [id, value] of Object.entries({ year: c.year, month: c.month, day: c.day, hour: c.hour, minute })) document.getElementById(id).value = value;
-  document.getElementById('summer-time').checked = false; syncCalendarButtons(); fourSheet.close(); render(calculate());
+  for (const [id, value] of Object.entries({ year: c.year, month: c.month, day: c.day, hour: c.hour, minute: c.minute })) document.getElementById(id).value = value;
+  document.getElementById('summer-time').checked = false; syncCalendarButtons();
+  try {
+    const data = calculate();
+    if (data.pillars.some((pillar, index) => pillar.ganzhi !== fourSelections[index])) throw new Error('候选时间与四柱不一致，请重新选择。');
+    fourSheet.close(); render(data);
+  } catch (exception) { document.getElementById('four-error').textContent = exception.message; document.getElementById('four-error').hidden = false; }
 }
 function safeText(item) { return String(item == null ? '' : item); }
 function solarMillis(solar) { return Date.UTC(solar.getYear(), solar.getMonth() - 1, solar.getDay(), solar.getHour(), solar.getMinute(), solar.getSecond()); }

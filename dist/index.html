@@ -71,13 +71,13 @@
     <p id="now-status" class="now-status" role="status" hidden></p><p id="date-error" class="error" role="alert" hidden></p>
   </dialog>
 
-  <dialog id="four-sheet" class="sheet-dialog four-sheet"><div class="sheet-head"><div class="segmented"><span>公历</span><span>农历</span><strong>四柱</strong></div><div class="four-actions"><button id="four-close" type="button" aria-label="关闭">×</button><button id="four-confirm" type="button" disabled>确认排盘</button></div></div>
+  <dialog id="four-sheet" class="sheet-dialog four-sheet"><div class="sheet-head"><h2>四柱反推</h2><div class="four-actions"><button id="four-confirm" type="button" disabled>确定</button><button id="four-close" type="button" aria-label="关闭">×</button></div></div>
     <div class="four-slot-labels"><span>年柱</span><span>月柱</span><span>日柱</span><span>时柱</span></div>
     <div id="four-slots" class="four-slots" aria-label="四柱选择"></div>
     <div class="four-range"><b>查找范围：</b><span>1801—2099年</span><button id="four-clear" type="button">清除</button></div>
     <div id="four-options" class="stem-grid" aria-label="当前可选干支"></div>
-    <div id="four-candidates" class="four-candidates" hidden><p>请选择对应出生日期和时辰</p><div id="four-candidate-list"></div><label>出生分钟<input id="four-minute" type="number" min="0" max="59" value="30"></label></div>
-    <p id="four-hint" class="four-hint">先选年柱；后续选项会按真实历法日期筛选。</p><p id="four-error" class="error" role="alert" hidden></p>
+    <div id="four-candidates" class="four-candidates" hidden><p>请选择对应的出生日期</p><div id="four-candidate-list"></div></div>
+    <p id="four-hint" class="four-hint">先选年柱天干，再选地支。</p><p id="four-error" class="error" role="alert" hidden></p>
   </dialog>
 
   <dialog id="display-sheet" class="sheet-dialog display-sheet"><div class="sheet-head"><h2>显示设置</h2><button id="display-close" type="button" aria-label="关闭">×</button></div>

@@ -251,18 +251,10 @@ body { background: #f2f2f2; }
 .date-actions { display: flex; gap: 12px; margin-top: 20px; }
 .date-actions button { flex: 1; min-height: 42px; border: 1px solid #d8d8d8; border-radius: 22px; background: #fff; font: inherit; }
 .date-actions button:last-child { border-color: #111; background: #111; color: #dfc18d; }
-.four-sheet { min-height: 59dvh; }
-.four-sheet .sheet-head { margin-bottom: 26px; }
-.four-sheet .sheet-head > button { padding: 7px 15px; border-radius: 24px; background: #050505; color: #c7a876; font-size: 13px; }
 .four-slot-labels { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; font-size: 15px; font-weight: 650; }
-.four-slots { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(2, 64px); justify-items: center; align-items: center; gap: 10px 0; margin: 18px 0 22px; }
-.four-slots span { width: 58px; height: 58px; border-radius: 50%; background: #f1f1f1; }
-.four-slots span:first-child { background: #ccc; }
 .four-range { display: flex; align-items: center; gap: 5px; font-size: 13px; }
 .four-range span { padding: 9px 12px; border-radius: 20px; background: #f8f5f0; color: #b88f4e; }
-.four-range small { margin-left: auto; color: #ccc; }
-.stem-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 9px; margin-top: 18px; }
-.stem-grid span { display: grid; place-items: center; height: 61px; border-radius: 9px; background: #f5f5f5; font-size: 29px; font-weight: 750; }
+.stem-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
 .four-hint { margin: 14px 0 0; color: #999; font-size: 11px; text-align: center; }
 .quick-entry { display: flex; align-items: center; gap: 7px; min-height: 49px; margin: 0 0 4px; padding: 4px 5px 4px 13px; border-radius: 28px; background: #f5f5f5; }
 .quick-entry input { flex: 1; min-width: 0; height: 40px; padding: 0; border: 0; background: transparent; font: inherit; font-size: 13px; }
@@ -280,25 +272,32 @@ body { background: #f2f2f2; }
 .wheel-option { display: grid; width: 100%; height: 36px; place-items: center; padding: 0 1px; border: 0; background: transparent; color: #bbb; font: inherit; font-size: 11px; font-weight: 600; white-space: nowrap; scroll-snap-align: center; }
 .wheel-option[aria-pressed="true"] { color: #171717; font-size: 13px; }
 .four-sheet { min-height: min(78dvh, 640px); }
-.four-sheet .sheet-head { margin-bottom: 16px; }
+.four-sheet .sheet-head { margin-bottom: 22px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+.four-sheet .sheet-head h2 { font-size: 17px; }
 .four-actions { display: flex; align-items: center; gap: 7px; }
-.four-sheet .four-actions > #four-close { width: 34px; min-width: 34px; min-height: 34px; padding: 0; border-radius: 50%; background: #f4f4f4; color: #666; font-size: 21px; }
-.four-sheet .four-actions > #four-confirm { min-width: 92px; }
+.four-sheet .four-actions > #four-close { width: 34px; min-width: 34px; min-height: 34px; padding: 0; border: 0; border-radius: 50%; background: #f4f4f4; color: #666; font-size: 21px; }
+.four-sheet .four-actions > #four-confirm { min-width: 76px; min-height: 36px; padding: 5px 13px; border: 0; border-radius: 20px; background: #050505; color: #dfc18d; font: inherit; font-size: 13px; }
 .four-slot-labels { color: #334456; font-size: 14px; }
-.four-slots { grid-template-rows: 58px; gap: 5px; margin: 10px 0 12px; }
-.four-slot { width: 100%; min-width: 0; height: 53px; border: 0; border-radius: 12px; background: #f4f4f4; color: #aaa; font: 700 19px/1.2 "Songti SC", serif; }
-.four-slot.filled { background: #f8f4ed; color: #243f59; }
+.four-slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin: 14px 0 18px; }
+.four-slot { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 0; border: 0; background: transparent; }
+.four-orb { display: grid; place-items: center; width: min(68px, 17vw); height: min(68px, 17vw); border-radius: 50%; background: #f2f2f2; font: 700 29px/1 "Songti SC", serif; }
+.four-orb.chosen { background: #f7f6f3; }
+.four-slot.active .four-orb.picking:not(.chosen) { background: #ccc; }
+.four-orb span { font: inherit; }
 .four-range { min-height: 43px; }
 .four-range button { min-width: 82px; min-height: 38px; margin-left: auto; border: 1px solid #d9d9d9; border-radius: 20px; background: #fff; color: #596676; font: inherit; font-size: 13px; font-weight: 650; }
-.stem-grid { max-height: 200px; overflow-y: auto; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 7px; margin-top: 12px; padding: 1px; }
-.four-option { display: flex; justify-content: center; align-items: center; gap: 0; min-width: 0; height: 48px; border: 0; border-radius: 9px; background: #f4f4f4; font: 700 22px/1.2 "Songti SC", serif; }
-.four-candidates { margin-top: 12px; padding: 10px; border-radius: 12px; background: #f8f6f2; }
+.stem-grid { max-height: 225px; overflow-y: auto; gap: 8px; padding: 1px; }
+.stem-grid[data-layout="branches"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.stem-grid[hidden], .four-candidates[hidden] { display: none; }
+.four-option { display: flex; justify-content: center; align-items: center; min-width: 0; height: 56px; border: 0; border-radius: 9px; background: #f4f4f4; font: 700 23px/1.2 "Songti SC", serif; }
+.stem-grid[data-layout="branches"] .four-option { font-size: 27px; }
+.four-candidates { margin-top: 12px; padding: 10px; border-radius: 12px; background: #fff; }
 .four-candidates > p { margin: 0 0 7px; color: #5b6672; font-size: 12px; }
-#four-candidate-list { display: grid; max-height: 155px; overflow-y: auto; gap: 5px; }
-.four-candidate { min-height: 38px; border: 1px solid #e5e0d7; border-radius: 8px; background: white; color: #334456; font: inherit; font-size: 13px; }
+#four-candidate-list { display: grid; max-height: 235px; overflow-y: auto; gap: 8px; }
+.four-candidate { display: flex; flex-direction: column; justify-content: center; align-items: flex-start; gap: 4px; min-height: 73px; padding: 10px 13px; border: 1px solid #e5e0d7; border-radius: 11px; background: #f5f5f5; color: #334456; font: inherit; font-size: 13px; text-align: left; }
+.four-candidate-solar { color: #806541; font-size: 14px; }
+.four-candidate-lunar { color: #777; font-size: 12px; }
 .four-candidate.selected { border-color: #b28a50; background: #faf2e4; color: #765422; }
-.four-candidates label { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; color: #596676; font-size: 12px; }
-.four-candidates input { width: 78px; height: 35px; padding: 3px 8px; }
 #four-confirm:disabled { opacity: .4; }
 .display-sheet .option-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 19px 8px; }
 @media (max-width: 380px) {
@@ -308,5 +307,5 @@ body { background: #f2f2f2; }
   .instant-pillar { font-size: 18px; }
   .instant-action strong { font-size: 17px; }
   .instant-action button { min-width: 102px; }
-  .four-slots span { width: 53px; height: 53px; }
+  .four-orb { width: min(65px, 17vw); height: min(65px, 17vw); }
 }
