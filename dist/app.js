@@ -526,13 +526,13 @@ function buildLuck(yun, solar, birthPillarYear, offset, mode) {
   });
 }
 
-function calculate() {
-  const y = number('year'), m = number('month'), d = number('day');
-  const h = number('hour'), minute = number('minute');
+function calculate(input = currentCaseInput()) {
+  const y = Number(input.year), m = Number(input.month), d = Number(input.day);
+  const h = Number(input.hour), minute = Number(input.minute);
   if (![y, m, d, h, minute].every(Number.isInteger) || y < 1801 || y > 2099 || m < 1 || m > 12 || d < 1 || d > 31 || h < 0 || h > 23 || minute < 0 || minute > 59) throw new Error('请填写 1801—2099 年内的完整出生时间。');
   let solar;
-  if (calendarType.value === 'lunar') {
-    const lunarMonth = document.getElementById('leap').checked ? -m : m;
+  if (input.calendar === 'lunar') {
+    const lunarMonth = input.leap ? -m : m;
     const lunar = Lunar.fromYmdHms(y, lunarMonth, d, h, minute, 0);
     if (lunar.getYear() !== y || lunar.getMonth() !== lunarMonth || lunar.getDay() !== d) throw new Error('农历日期不存在，请检查是否为闰月。');
     solar = lunar.getSolar();
@@ -541,14 +541,14 @@ function calculate() {
     solar = Solar.fromYmdHms(y, m, d, h, minute, 0);
   }
   const inputSolar = solar;
-  const summerTime = document.getElementById('summer-time').checked;
+  const summerTime = Boolean(input.summerTime);
   if (summerTime) {
     if (!chinaSummerTime(solar)) throw new Error('此时间不在排盘宝支持的夏令时阶段（中国大陆 1986—1991 年），请关闭夏令时或核对出生资料。');
     solar = solarFromMillis(solarMillis(solar) - 3600000);
   }
   const lunar = solar.getLunar();
   const eight = lunar.getEightChar();
-  eight.setSect(document.getElementById('zi-rule').value === '23' ? 1 : 2);
+  eight.setSect(input.ziRule === '23' ? 1 : 2);
   ApkTerms.correctPillars(lunar, eight, solarMillis(solar));
   const names = ['年柱', '月柱', '日柱', '时柱'];
   const keys = ['Year', 'Month', 'Day', 'Time'];
@@ -558,13 +558,13 @@ function calculate() {
     hiddenStems: eight[`get${key}HideGan`](), hiddenGods: eight[`get${key}ShiShenZhi`](),
     stage: eight[`get${key}DiShi`](), empty: eight[`get${key}XunKong`](),
   }));
-  const shenSha = ApkShenSha.calculate(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'), { solarMillis: solarMillis(solar), lunarMonth: lunar.getMonth() });
-  const gates = ApkShenSha.calculateGates(pillars, document.getElementById('zi-rule').value === '23' ? 1 : 2, number('gender'));
-  const yun = eight.getYun(number('gender'));
+  const shenSha = ApkShenSha.calculate(pillars, input.ziRule === '23' ? 1 : 2, Number(input.gender), { solarMillis: solarMillis(solar), lunarMonth: lunar.getMonth() });
+  const gates = ApkShenSha.calculateGates(pillars, input.ziRule === '23' ? 1 : 2, Number(input.gender));
+  const yun = eight.getYun(Number(input.gender));
   const offset = startOffset(yun, solar);
   const solarYearGanZhi = Solar.fromYmdHms(solar.getYear(), 7, 1, 12, 0, 0).getLunar().getYearInGanZhiExact();
   const birthPillarYear = lunar.getYearInGanZhiExact() === solarYearGanZhi ? solar.getYear() : solar.getYear() - 1;
-  const yunMode = value('yun-mode');
+  const yunMode = input.yunMode;
   const luck = buildLuck(yun, solar, birthPillarYear, offset, yunMode);
   const priorJie = ApkTerms.getJie(solarMillis(solar) + 1000, false);
   const daysAfterJie = Math.floor((solarMillis(solar) + 1000 - priorJie.time) / 86400000) + 1;
@@ -574,7 +574,7 @@ function calculate() {
     ['命宫', `${eight.getMingGong()} · ${eight.getMingGongNaYin()}`],
     ['身宫', `${eight.getShenGong()} · ${eight.getShenGongNaYin()}`],
   ];
-  return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: number('gender'), name: value('chart-name'), input: currentCaseInput() };
+  return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: Number(input.gender), name: input.name, input };
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
@@ -849,21 +849,19 @@ function showCaseSaveError(error) {
   message.hidden = false;
 }
 async function saveCurrentCase(data) {
-  const input = data.input;
-  const id = JSON.stringify(input);
-  const previous = await CaseStore.get(id);
-  await CaseStore.put({ id, schemaVersion: 1, createdAt: previous?.createdAt || Date.now(), updatedAt: Date.now(),
-    input, display: { name: data.name || '未命名案例', gender: data.gender, solar: `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`, pillars: data.pillars.map(p => p.ganzhi) } });
+  await CaseActions.saveCalculated(data);
 }
 async function refreshCases() {
   const list = document.getElementById('cases-list');
   const empty = document.getElementById('cases-empty');
-  const query = document.getElementById('case-search-input').value.trim().toLowerCase();
+  const query = document.getElementById('case-search-input').value.trim();
   list.replaceChildren();
   try {
-    const records = (await CaseStore.list()).filter(item => `${item.display.name} ${item.display.solar}`.toLowerCase().includes(query));
+    const records = await CaseActions.search({ text: query, gender: document.getElementById('case-gender-filter').value,
+      pillar: document.getElementById('case-pillar-filter').value });
     empty.hidden = records.length > 0;
-    empty.textContent = query ? '没有找到符合条件的案例' : '还没有收藏的案例\n打开首页“保存”，排盘后会自动收录';
+    empty.textContent = query || document.getElementById('case-gender-filter').value || document.getElementById('case-pillar-filter').value
+      ? '没有找到符合条件的案例' : '还没有收藏的案例\n打开首页“保存”，排盘后会自动收录';
     for (const item of records) {
       const row = make('button', 'case-row'); row.type = 'button'; row.dataset.caseId = item.id;
       const details = make('span', 'case-details');
@@ -880,6 +878,49 @@ async function refreshCases() {
   } catch (error) { showCaseSaveError(error); empty.hidden = false; }
 }
 document.getElementById('case-search-input').addEventListener('input', refreshCases);
+document.getElementById('case-gender-filter').addEventListener('change', refreshCases);
+document.getElementById('case-pillar-filter').addEventListener('input', refreshCases);
+const caseImportSheet = document.getElementById('case-import-sheet');
+const caseImportText = document.getElementById('case-import-text');
+const caseImportStatus = document.getElementById('case-import-status');
+const caseImportConfirm = document.getElementById('case-import-confirm');
+function resetCaseImportPreview() {
+  caseImportConfirm.disabled = true;
+  caseImportStatus.textContent = '';
+  document.getElementById('case-import-preview').replaceChildren();
+}
+document.getElementById('case-import-open').addEventListener('click', () => {
+  resetCaseImportPreview(); caseImportSheet.showModal();
+});
+document.getElementById('case-import-close').addEventListener('click', () => caseImportSheet.close());
+caseImportText.addEventListener('input', resetCaseImportPreview);
+document.getElementById('case-import-file').addEventListener('change', async event => {
+  const file = event.target.files?.[0]; if (!file) return;
+  try { caseImportText.value = await file.text(); resetCaseImportPreview(); }
+  catch (_) { caseImportStatus.textContent = '读取文件失败，请粘贴内容重试'; }
+});
+document.getElementById('case-import-preview-button').addEventListener('click', async () => {
+  resetCaseImportPreview();
+  try {
+    const preview = await CaseActions.previewImport(caseImportText.value);
+    caseImportStatus.textContent = `共 ${preview.total} 条：可新增 ${preview.added} 条，重复 ${preview.duplicate} 条，错误 ${preview.error} 条`;
+    caseImportConfirm.disabled = preview.added === 0;
+    const box = document.getElementById('case-import-preview');
+    for (const item of preview.details) {
+      const row = make('div', `case-import-row ${item.status}`);
+      row.append(make('strong', '', `${item.row}. ${item.label}`), make('span', '', item.message));
+      box.append(row);
+    }
+  } catch (exception) { caseImportStatus.textContent = exception.message || '无法读取案例资料'; }
+});
+caseImportConfirm.addEventListener('click', async () => {
+  caseImportConfirm.disabled = true;
+  try {
+    const count = await CaseActions.commitImport();
+    caseImportStatus.textContent = `已导入 ${count} 条案例，保存在此设备`;
+    await refreshCases();
+  } catch (exception) { caseImportStatus.textContent = exception.message || '导入失败'; }
+});
 document.getElementById('cases-list').addEventListener('click', async event => {
   const row = event.target.closest('[data-case-id]'); if (!row) return;
   try {

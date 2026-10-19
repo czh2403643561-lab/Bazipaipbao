@@ -234,10 +234,11 @@ body { background: #f2f2f2; }
 .case-search { display: flex; align-items: center; gap: 7px; height: 45px; padding: 0 12px; border-radius: 8px; background: #fff; color: #aaa; }
 .case-search > span { font-size: 25px; line-height: 1; }
 .case-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 14px; }
-.case-filter { display: flex; align-items: center; gap: 14px; min-height: 47px; overflow: hidden; white-space: nowrap; }
-.case-filter button { padding: 4px 2px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #999; font: inherit; font-size: 13px; white-space: nowrap; }
-.case-filter button.active { border-color: #a88a54; color: #a88a54; }
-.case-filter button:disabled { opacity: .7; }
+.case-tools { display: flex; align-items: center; gap: 8px; min-height: 52px; }
+.case-tools label { display: flex; align-items: center; gap: 4px; min-width: 0; color: #7b8590; font-size: 12px; white-space: nowrap; }
+.case-tools select, .case-tools input { width: 66px; min-height: 31px; padding: 4px; border: 1px solid #e2ded6; border-radius: 7px; background: #fff; color: #33465a; font: inherit; }
+.case-tools input { width: 65px; }
+.case-tools > button { min-height: 33px; margin-left: auto; padding: 5px 10px; border: 1px solid #b39a6d; border-radius: 17px; background: #fff; color: #94703c; font: inherit; font-size: 12px; white-space: nowrap; }
 .cases-list { overflow: hidden; border-radius: 12px; background: #fff; }
 .case-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; min-height: 82px; padding: 11px 13px; border: 0; border-bottom: 1px solid #ededed; background: #fff; color: #33465a; font: inherit; text-align: left; cursor: pointer; }
 .case-row:last-child { border-bottom: 0; }
@@ -249,6 +250,20 @@ body { background: #f2f2f2; }
 .case-pillar-line { display: flex; gap: 3px; }
 .cases-empty { padding: 70px 20px; color: #999; font-size: 13px; line-height: 1.8; text-align: center; white-space: pre-line; }
 .cases-error { margin: 10px 0; color: #9d312c; font-size: 12px; }
+.case-import-sheet { max-height: 90dvh; }
+.case-import-help { margin: 0 0 11px; color: #687787; font-size: 12px; line-height: 1.55; }
+.case-file-label { display: block; margin-bottom: 10px; color: #917144; font-size: 12px; }
+.case-file-label input { display: block; width: 100%; margin-top: 5px; color: #33465a; font: inherit; }
+#case-import-text { box-sizing: border-box; width: 100%; min-height: 120px; padding: 10px; border: 1px solid #dcd9d4; border-radius: 9px; resize: vertical; color: #33465a; font: inherit; font-size: 13px; line-height: 1.5; }
+.case-import-actions { display: flex; gap: 10px; margin: 12px 0; }
+.case-import-actions button { flex: 1; min-height: 40px; border: 1px solid #d9d1c4; border-radius: 21px; background: #fff; color: #805e31; font: inherit; font-size: 13px; }
+.case-import-actions #case-import-confirm { border-color: #050505; background: #050505; color: #dfc18d; }
+.case-import-actions button:disabled { opacity: .45; }
+.case-import-status { min-height: 20px; color: #765b39; font-size: 12px; }
+.case-import-preview { display: grid; gap: 7px; max-height: 220px; overflow-y: auto; }
+.case-import-row { display: flex; flex-direction: column; gap: 2px; padding: 8px; border-radius: 7px; background: #f7f7f7; color: #526272; font-size: 12px; }
+.case-import-row.error { background: #fff1ef; color: #a3342c; }
+.case-import-row.duplicate { color: #999; }
 .chart-empty { display: grid; min-height: calc(100dvh - 135px); place-items: center; color: #9b9b9b; font-size: 14px; text-align: center; }
 .chart-screen .result { margin: 0; padding: 12px 11px 16px; border: 0; border-radius: 0; background: #fff; }
 .result .result-heading { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; }

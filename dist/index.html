@@ -57,8 +57,8 @@
     </section>
     <section id="cases-screen" class="app-screen cases-screen" aria-label="案例" hidden>
       <div class="cases-top"><strong>我的案例</strong><span>保存在此设备</span></div>
-      <div class="case-search"><span aria-hidden="true">⌕</span><input id="case-search-input" type="search" placeholder="搜索姓名或出生日期" aria-label="搜索案例"></div>
-      <div class="case-filter"><button class="active" type="button">全部</button><button type="button" disabled>分组待接入</button><button type="button" disabled>筛选待接入</button><button type="button" disabled>编辑待接入</button></div>
+      <div class="case-search"><span aria-hidden="true">⌕</span><input id="case-search-input" type="search" placeholder="搜索姓名、日期或干支" aria-label="搜索案例"></div>
+      <div class="case-tools"><label>性别<select id="case-gender-filter"><option value="">全部</option><option value="1">男</option><option value="0">女</option></select></label><label>四柱<input id="case-pillar-filter" type="text" maxlength="2" placeholder="如 甲子" aria-label="按四柱干支筛选"></label><button id="case-import-open" type="button">批量导入</button></div>
       <div id="cases-list" class="cases-list"></div>
       <p id="cases-empty" class="cases-empty">还没有收藏的案例<br>打开首页“保存”，排盘后会自动收录</p>
       <p id="cases-error" class="cases-error" role="alert" hidden></p>
@@ -91,6 +91,14 @@
   <dialog id="display-sheet" class="sheet-dialog display-sheet"><div class="sheet-head"><h2>显示设置</h2><button id="display-close" type="button" aria-label="关闭">×</button></div>
     <div class="display-settings option-grid"><label class="check"><input id="show-hidden" type="checkbox" checked><span>显示藏干</span></label><label class="check"><input id="show-nayin" type="checkbox" checked><span>显示纳音</span></label><label class="check"><input id="show-stage" type="checkbox" checked><span>显示长生</span></label><label class="check"><input id="show-empty" type="checkbox" checked><span>显示空亡</span></label><label class="check"><input id="show-shensha" type="checkbox" checked><span>显示神煞</span></label><label class="check"><input id="show-gates" type="checkbox"><span>显示关卡</span></label></div>
   </dialog>
-  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script>
+  <dialog id="case-import-sheet" class="sheet-dialog case-import-sheet"><div class="sheet-head"><h2>批量导入案例</h2><button id="case-import-close" type="button" aria-label="关闭">×</button></div>
+    <p class="case-import-help">粘贴 CSV 或 JSON，也可以选择文件。先预览，确认后一次存入本机案例。</p>
+    <label class="case-file-label">选择 CSV / JSON 文件<input id="case-import-file" type="file" accept=".csv,.json,.txt,text/csv,application/json,text/plain"></label>
+    <textarea id="case-import-text" spellcheck="false" placeholder="姓名,性别,出生时间,历法&#10;小明,男,2003-05-16 07:20,公历" aria-label="粘贴案例资料"></textarea>
+    <p class="case-import-help">可填写：姓名、性别、出生时间、历法；农历或特殊设置可另加年、月、日、时、分、闰月、夏令时、子时换日、起运方式列。</p>
+    <div class="case-import-actions"><button id="case-import-preview-button" type="button">预览</button><button id="case-import-confirm" type="button" disabled>确认导入</button></div>
+    <p id="case-import-status" class="case-import-status" role="status"></p><div id="case-import-preview" class="case-import-preview"></div>
+  </dialog>
+  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script><script src="case-actions.js"></script>
 </body>
 </html>

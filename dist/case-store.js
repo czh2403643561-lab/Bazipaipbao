@@ -36,5 +36,17 @@ window.CaseStore = (() => {
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const get = id => transaction('readonly', store => store.get(id));
   const put = record => transaction('readwrite', store => store.put(record));
-  return { list, get, put };
+  async function putMany(records) {
+    if (!records.length) return 0;
+    const db = await open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('cases', 'readwrite');
+      const store = tx.objectStore('cases');
+      for (const record of records) store.put(record);
+      tx.oncomplete = () => resolve(records.length);
+      tx.onerror = () => reject(tx.error || new Error('批量保存失败'));
+      tx.onabort = () => reject(tx.error || new Error('批量保存失败'));
+    });
+  }
+  return { list, get, put, putMany };
 })();
