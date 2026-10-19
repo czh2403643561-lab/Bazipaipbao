@@ -6,6 +6,7 @@ const calendarType = document.getElementById('calendar-type');
 const modeOutput = document.getElementById('mode-output');
 const nowStatus = document.getElementById('now-status');
 let latestData = null;
+let editingCaseId = null;
 let activeMode = 'traditional';
 let selectedLuckIndex = null;
 let selectedYearIndex = null;
@@ -830,7 +831,7 @@ function render(data) {
   showScreen('chart');
   const feedback = document.getElementById('case-save-feedback');
   feedback.hidden = true;
-  if (autoSave.checked && !openingSavedCase) saveCurrentCase(data)
+  if (autoSave.checked && !openingSavedCase && !editingCaseId) saveCurrentCase(data)
     .then(() => { feedback.textContent = '已保存到本机案例'; feedback.hidden = false; })
     .catch(error => { showCaseSaveError(error); feedback.textContent = '案例保存失败，请检查本机储存权限'; feedback.hidden = false; });
 }
@@ -863,7 +864,7 @@ async function refreshCases() {
     empty.textContent = query || document.getElementById('case-gender-filter').value || document.getElementById('case-pillar-filter').value
       ? '没有找到符合条件的案例' : '还没有收藏的案例\n打开首页“保存”，排盘后会自动收录';
     for (const item of records) {
-      const row = make('button', 'case-row'); row.type = 'button'; row.dataset.caseId = item.id;
+      const row = make('div', 'case-row'); row.dataset.caseId = item.id;
       const details = make('span', 'case-details');
       details.append(make('strong', '', item.display.name), make('span', '', item.display.gender === 1 ? '男' : '女'), make('small', '', item.display.solar));
       const pillars = make('span', 'case-pillars');
@@ -872,7 +873,11 @@ async function refreshCases() {
         item.display.pillars.forEach(pillar => line.append(colored(pillar[part])));
         pillars.append(line);
       }
-      row.append(details, pillars); list.append(row);
+      const actions = make('span', 'case-row-actions');
+      for (const [action, label] of [['open', '打开'], ['edit', '编辑'], ['delete', '删除']]) {
+        const button = make('button', '', label); button.type = 'button'; button.dataset.caseAction = action; button.setAttribute('aria-label', `${label}${item.display.name}`); actions.append(button);
+      }
+      row.append(details, pillars, actions); list.append(row);
     }
     document.getElementById('cases-error').hidden = true;
   } catch (error) { showCaseSaveError(error); empty.hidden = false; }
@@ -921,10 +926,56 @@ caseImportConfirm.addEventListener('click', async () => {
     await refreshCases();
   } catch (exception) { caseImportStatus.textContent = exception.message || '导入失败'; }
 });
+const caseRestoreSheet = document.getElementById('case-restore-sheet');
+const caseBackupFile = document.getElementById('case-backup-file');
+const caseRestoreStatus = document.getElementById('case-restore-status');
+const caseRestoreConfirm = document.getElementById('case-restore-confirm');
+document.getElementById('case-backup-export').addEventListener('click', async () => {
+  try {
+    const backup = await CaseActions.exportBackup();
+    const url = URL.createObjectURL(new Blob([backup], { type: 'application/json;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url;
+    link.download = `八字案例备份-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    document.getElementById('cases-error').hidden = true;
+  } catch (exception) { showCaseSaveError(exception); }
+});
+document.getElementById('case-backup-restore-open').addEventListener('click', () => caseBackupFile.click());
+document.getElementById('case-restore-close').addEventListener('click', () => caseRestoreSheet.close());
+caseBackupFile.addEventListener('change', async event => {
+  const file = event.target.files?.[0]; if (!file) return;
+  caseRestoreConfirm.disabled = true; caseRestoreStatus.textContent = '正在检查备份…';
+  document.getElementById('case-restore-preview').replaceChildren();
+  caseRestoreSheet.showModal();
+  try {
+    const preview = await CaseActions.previewRestore(await file.text());
+    caseRestoreStatus.textContent = `共 ${preview.total} 条：可恢复 ${preview.added} 条，重复 ${preview.duplicate} 条，错误 ${preview.error} 条`;
+    caseRestoreConfirm.disabled = preview.added === 0;
+    const box = document.getElementById('case-restore-preview');
+    for (const item of preview.details) {
+      const row = make('div', `case-import-row ${item.status}`);
+      row.append(make('strong', '', `${item.row}. ${item.label}`), make('span', '', item.message)); box.append(row);
+    }
+  } catch (exception) { caseRestoreStatus.textContent = exception.message || '无法读取备份'; }
+  finally { caseBackupFile.value = ''; }
+});
+caseRestoreConfirm.addEventListener('click', async () => {
+  caseRestoreConfirm.disabled = true;
+  try {
+    const count = await CaseActions.commitRestore();
+    caseRestoreStatus.textContent = `已恢复 ${count} 条案例`;
+    await refreshCases();
+  } catch (exception) { caseRestoreStatus.textContent = exception.message || '恢复失败'; }
+});
 document.getElementById('cases-list').addEventListener('click', async event => {
-  const row = event.target.closest('[data-case-id]'); if (!row) return;
+  const button = event.target.closest('[data-case-action]'); if (!button) return;
+  const row = button.closest('[data-case-id]'); if (!row) return;
   try {
     const record = await CaseStore.get(row.dataset.caseId); if (!record) return;
+    if (button.dataset.caseAction === 'delete') {
+      if (!window.confirm(`确定删除“${record.display.name}”的案例吗？此操作无法撤销。`)) return;
+      await CaseActions.remove(record.id); await refreshCases(); return;
+    }
     const input = record.input;
     for (const field of ['name', 'gender', 'calendar', 'year', 'month', 'day', 'hour', 'minute', 'ziRule', 'yunMode']) {
       const ids = { name: 'chart-name', calendar: 'calendar-type', ziRule: 'zi-rule', yunMode: 'yun-mode' };
@@ -934,6 +985,14 @@ document.getElementById('cases-list').addEventListener('click', async event => {
     document.getElementById('summer-time').checked = input.summerTime;
     for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button.dataset.gender === input.gender));
     syncCalendarButtons(); updateBirthSummary();
+    if (button.dataset.caseAction === 'edit') {
+      editingCaseId = record.id;
+      document.getElementById('chart-submit').textContent = '保存案例修改';
+      document.getElementById('cancel-case-edit').hidden = false;
+      showScreen('home');
+      document.getElementById('chart-name').focus({ preventScroll: true });
+      return;
+    }
     openingSavedCase = true; render(calculate());
   } catch (error) { showCaseSaveError(error); }
   finally { openingSavedCase = false; }
@@ -986,7 +1045,29 @@ initializeHomeNow();
 
 form.addEventListener('submit', event => {
   event.preventDefault(); error.hidden = true;
-  try { render(calculate()); }
+  try {
+    const data = calculate(); render(data);
+    if (editingCaseId) {
+      const id = editingCaseId;
+      CaseActions.update(id, currentCaseInput()).then(() => {
+        editingCaseId = null;
+        document.getElementById('chart-submit').textContent = '开始排盘';
+        document.getElementById('cancel-case-edit').hidden = true;
+        document.getElementById('case-save-feedback').textContent = '案例已更新';
+        document.getElementById('case-save-feedback').hidden = false;
+        refreshCases();
+      }).catch(exception => {
+        const feedback = document.getElementById('case-save-feedback');
+        feedback.textContent = `案例未保存：${exception.message || '更新失败'}`; feedback.hidden = false;
+      });
+    }
+  }
   catch (exception) { result.hidden = true; error.textContent = exception instanceof Error ? exception.message : '排盘失败，请检查输入。'; error.hidden = false; }
+});
+document.getElementById('cancel-case-edit').addEventListener('click', () => {
+  editingCaseId = null;
+  document.getElementById('chart-submit').textContent = '开始排盘';
+  document.getElementById('cancel-case-edit').hidden = true;
+  showScreen('cases');
 });
 if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});

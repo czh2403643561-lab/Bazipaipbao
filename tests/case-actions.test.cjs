@@ -18,7 +18,8 @@ const document = { getElementById(id) { return fields[id] ||= element(); }, quer
 const records = new Map();
 const CaseStore = { async list() { return [...records.values()]; }, async get(id) { return records.get(id); },
   async put(record) { records.set(record.id, record); },
-  async putMany(batch) { for (const record of batch) records.set(record.id, record); return batch.length; } };
+  async putMany(batch) { for (const record of batch) records.set(record.id, record); return batch.length; },
+  async remove(id) { records.delete(id); } };
 const context = { Solar, Lunar, ApkTerms: global.ApkTerms, ApkShenSha: global.ApkShenSha,
   CaseStore, document, navigator: {}, location: { protocol: 'file:' }, Intl, Date, Math, Number, String, Array, Object, Error, console };
 context.window = context;
@@ -45,5 +46,19 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   const edited = await context.CaseActions.update(saved.id, { name: '小明（已核对）' });
   assert.equal(edited.display.name, '小明（已核对）');
   assert.equal(edited.id, saved.id);
-  console.log('案例批量预览、查重、保存、筛选和修改：通过');
+  const backup = await context.CaseActions.exportBackup();
+  const backupData = JSON.parse(backup);
+  assert.equal(backupData.format, 'bazi-case-backup');
+  records.clear();
+  const restore = await context.CaseActions.previewRestore(backup);
+  assert.equal(restore.added, 2);
+  assert.equal(records.size, 0, 'restore preview must not write cases');
+  assert.equal(await context.CaseActions.commitRestore(), 2);
+  assert.equal(records.size, 2);
+  assert.equal((await context.CaseActions.previewRestore(backup)).duplicate, 2);
+  const restored = [...records.values()].find(record => record.display.name === '小明（已核对）');
+  assert.equal(restored.display.pillars.length, 4);
+  assert.equal((await context.CaseActions.remove(restored.id)).id, restored.id);
+  assert.equal(records.size, 1);
+  console.log('案例批量预览、查重、保存、筛选、修改、备份恢复和删除：通过');
 })().catch(error => { console.error(error); process.exitCode = 1; });

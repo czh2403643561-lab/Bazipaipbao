@@ -36,6 +36,7 @@ window.CaseStore = (() => {
     .sort((a, b) => b.updatedAt - a.updatedAt);
   const get = id => transaction('readonly', store => store.get(id));
   const put = record => transaction('readwrite', store => store.put(record));
+  const remove = id => transaction('readwrite', store => store.delete(id));
   async function putMany(records) {
     if (!records.length) return 0;
     const db = await open();
@@ -48,5 +49,5 @@ window.CaseStore = (() => {
       tx.onabort = () => reject(tx.error || new Error('批量保存失败'));
     });
   }
-  return { list, get, put, putMany };
+  return { list, get, put, putMany, remove };
 })();

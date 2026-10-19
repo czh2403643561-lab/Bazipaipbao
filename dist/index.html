@@ -33,7 +33,7 @@
           <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日</option></select></label>
           <label class="field"><span>起运方式</span><select id="yun-mode"><option value="year">按年（原版默认）</option><option value="cumulative">按岁累加</option><option value="simple">按岁简化</option><option value="rounded">按岁舍入</option></select></label>
         </details>
-        <button class="start-button" type="submit">开始排盘</button>
+        <button class="start-button" type="submit" id="chart-submit">开始排盘</button><button class="cancel-case-edit" id="cancel-case-edit" type="button" hidden>取消编辑</button>
         <p id="error" class="error" role="alert" hidden></p>
       </form>
 
@@ -57,6 +57,7 @@
     </section>
     <section id="cases-screen" class="app-screen cases-screen" aria-label="案例" hidden>
       <div class="cases-top"><strong>我的案例</strong><span>保存在此设备</span></div>
+      <div class="case-backup-tools"><button id="case-backup-export" type="button">导出备份</button><button id="case-backup-restore-open" type="button">恢复备份</button><input id="case-backup-file" type="file" accept=".json,application/json" hidden></div>
       <div class="case-search"><span aria-hidden="true">⌕</span><input id="case-search-input" type="search" placeholder="搜索姓名、日期或干支" aria-label="搜索案例"></div>
       <div class="case-tools"><label>性别<select id="case-gender-filter"><option value="">全部</option><option value="1">男</option><option value="0">女</option></select></label><label>四柱<input id="case-pillar-filter" type="text" maxlength="2" placeholder="如 甲子" aria-label="按四柱干支筛选"></label><button id="case-import-open" type="button">批量导入</button></div>
       <div id="cases-list" class="cases-list"></div>
@@ -98,6 +99,10 @@
     <p class="case-import-help">可填写：姓名、性别、出生时间、历法；农历或特殊设置可另加年、月、日、时、分、闰月、夏令时、子时换日、起运方式列。</p>
     <div class="case-import-actions"><button id="case-import-preview-button" type="button">预览</button><button id="case-import-confirm" type="button" disabled>确认导入</button></div>
     <p id="case-import-status" class="case-import-status" role="status"></p><div id="case-import-preview" class="case-import-preview"></div>
+  </dialog>
+  <dialog id="case-restore-sheet" class="sheet-dialog case-import-sheet"><div class="sheet-head"><h2>恢复案例备份</h2><button id="case-restore-close" type="button" aria-label="关闭">×</button></div>
+    <p class="case-import-help">先检查备份内容，再确认恢复。重复案例和有问题的资料会跳过。</p><p id="case-restore-status" class="case-import-status" role="status"></p><div id="case-restore-preview" class="case-import-preview"></div>
+    <div class="case-import-actions"><button id="case-restore-confirm" type="button" disabled>确认恢复</button></div>
   </dialog>
   <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script><script src="case-actions.js"></script>
 </body>

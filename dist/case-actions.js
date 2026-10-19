@@ -117,14 +117,14 @@ window.CaseActions = (() => {
         details.push({ row: index + 1, label: String(field(rows[index] || {}, 'name') || '未命名'), status: 'error', message: error.message });
       }
     }
-    pending = prepared;
+    pending = { kind: 'import', records: prepared };
     return { total: rows.length, added: prepared.length,
       duplicate: details.filter(item => item.status === 'duplicate').length,
       error: details.filter(item => item.status === 'error').length, details };
   }
   async function commitImport() {
-    if (!pending) throw new Error('请先预览导入资料');
-    const records = pending; pending = null;
+    if (!pending || pending.kind !== 'import') throw new Error('请先预览导入资料');
+    const records = pending.records; pending = null;
     return CaseStore.putMany(records);
   }
   async function saveCalculated(data) {
@@ -137,9 +137,65 @@ window.CaseActions = (() => {
     const existing = await CaseStore.get(id);
     if (!existing) throw new Error('案例不存在');
     const input = normalize({ ...existing.input, ...changes });
+    const duplicate = (await CaseStore.list()).find(record => record.id !== id && signature(record.input) === signature(input));
+    if (duplicate) throw new Error('修改后的资料与另一个案例重复');
     const record = recordFrom(calculate(input), existing);
     await CaseStore.put(record);
     return record;
+  }
+  async function remove(id) {
+    const existing = await CaseStore.get(id);
+    if (!existing) throw new Error('案例不存在');
+    await CaseStore.remove(id);
+    return existing;
+  }
+  async function exportBackup() {
+    return JSON.stringify({ format: 'bazi-case-backup', version: 1, exportedAt: new Date().toISOString(), cases: await CaseStore.list() }, null, 2);
+  }
+  async function previewRestore(source) {
+    pending = null;
+    let backup;
+    try { backup = JSON.parse(String(source).replace(/^\uFEFF/, '')); }
+    catch (_) { throw new Error('备份文件不是有效的 JSON'); }
+    if (!backup || backup.format !== 'bazi-case-backup' || backup.version !== 1 || !Array.isArray(backup.cases)) {
+      throw new Error('备份格式或版本不受支持');
+    }
+    if (backup.cases.length > 5000) throw new Error('备份最多支持5000条案例');
+    const existingRecords = await CaseStore.list();
+    const existing = new Map(existingRecords.map(record => [signature(record.input), record]));
+    const reservedIds = new Set(existingRecords.map(record => record.id));
+    const seen = new Set(); const details = []; const records = [];
+    for (let index = 0; index < backup.cases.length; index++) {
+      const sourceRecord = backup.cases[index];
+      try {
+        if (!sourceRecord || typeof sourceRecord !== 'object' || !sourceRecord.input) throw new Error('缺少出生资料');
+        const input = normalize(sourceRecord.input);
+        const key = signature(input);
+        const label = input.name || `${input.year}-${input.month}-${input.day}`;
+        if (existing.has(key) || seen.has(key)) {
+          details.push({ row: index + 1, label, status: 'duplicate', message: '已存在或备份内重复，恢复时跳过' });
+          continue;
+        }
+        const record = recordFrom(calculate(input));
+        if (typeof sourceRecord.id === 'string' && sourceRecord.id && !reservedIds.has(sourceRecord.id)) record.id = sourceRecord.id;
+        else if (reservedIds.has(record.id)) record.id = `case:restore:${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`}`;
+        if (Number.isFinite(sourceRecord.createdAt)) record.createdAt = sourceRecord.createdAt;
+        if (Number.isFinite(sourceRecord.updatedAt)) record.updatedAt = sourceRecord.updatedAt;
+        records.push(record); seen.add(key); reservedIds.add(record.id);
+        details.push({ row: index + 1, label, status: 'new', message: record.display.pillars.join(' ') });
+      } catch (error) {
+        details.push({ row: index + 1, label: `第${index + 1}条`, status: 'error', message: error.message || '出生资料无效' });
+      }
+    }
+    pending = { kind: 'restore', records };
+    return { total: backup.cases.length, added: records.length,
+      duplicate: details.filter(item => item.status === 'duplicate').length,
+      error: details.filter(item => item.status === 'error').length, details };
+  }
+  async function commitRestore() {
+    if (!pending || pending.kind !== 'restore') throw new Error('请先预览备份');
+    const records = pending.records; pending = null;
+    return CaseStore.putMany(records);
   }
   async function search(filter = {}) {
     const text = String(filter.text || '').trim().toLowerCase();
@@ -155,5 +211,5 @@ window.CaseActions = (() => {
         && (!from || display.solar.slice(0, 10) >= from) && (!to || display.solar.slice(0, 10) <= to);
     });
   }
-  return { normalize, search, previewImport, commitImport, saveCalculated, update };
+  return { normalize, search, previewImport, commitImport, previewRestore, commitRestore, exportBackup, saveCalculated, update, remove };
 })();
