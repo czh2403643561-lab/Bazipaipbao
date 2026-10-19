@@ -20,6 +20,23 @@ let fourEditIndex = 0;
 let fourPhase = 'stem';
 let fourPendingStem = '';
 let fourRecordZiRule = null;
+const SIQUAN_RULES = {
+  子: [['壬', 10], ['癸', 20]], 丑: [['癸', 9], ['辛', 3], ['己', 18]],
+  寅: [['戊', 7], ['丙', 7], ['甲', 16]], 卯: [['甲', 10], ['乙', 20]],
+  辰: [['乙', 9], ['癸', 3], ['戊', 18]], 巳: [['戊', 5], ['庚', 9], ['丙', 16]],
+  午: [['丙', 10], ['己', 9], ['丁', 11]], 未: [['丁', 9], ['乙', 3], ['己', 18]],
+  申: [['戊', 10], ['壬', 3], ['庚', 17]], 酉: [['庚', 10], ['辛', 20]],
+  戌: [['辛', 9], ['丁', 3], ['戊', 18]], 亥: [['戊', 7], ['甲', 5], ['壬', 18]],
+};
+function siQuanStem(monthBranch, dayAfterJie) {
+  let elapsed = 0;
+  const sections = SIQUAN_RULES[monthBranch] || [];
+  for (const [stem, days] of sections) {
+    if (dayAfterJie > elapsed && dayAfterJie <= elapsed + days) return stem;
+    elapsed += days;
+  }
+  return dayAfterJie > elapsed && sections.length ? sections[sections.length - 1][0] : '';
+}
 const autoSave = document.getElementById('auto-save');
 try { autoSave.checked = localStorage.getItem('bazi-auto-save') === '1'; } catch (_) { /* Private browsing can deny storage. */ }
 const birthSheet = document.getElementById('birth-sheet');
@@ -42,6 +59,71 @@ function updateBirthSummary() {
     const monthName = document.getElementById('leap').checked ? `闰${lunarMonths[Number(month) - 1]}` : lunarMonths[Number(month) - 1];
     document.getElementById('birth-summary').textContent = `农历 ${year}年${monthName || `${month}月`}${lunarDayName(day)} ${hour}:${minute}`;
   } else document.getElementById('birth-summary').textContent = `${year}-${month}-${day} ${hour}:${minute}`;
+}
+function setBirthLocation(location) {
+  const value = String(location || '').trim();
+  document.getElementById('birth-location').value = value;
+  document.getElementById('birth-place-summary').textContent = value || '未知地 · 北京时间';
+}
+function renderRegionOptions(select, options, selected = '') {
+  select.replaceChildren();
+  for (const option of options) {
+    const node = document.createElement('option'); node.value = option.value; node.textContent = option.label;
+    select.append(node);
+  }
+  if (selected && [...select.options].some(option => option.value === selected)) select.value = selected;
+}
+function regionPathText(province, city, area) { return [province, city, area].filter(Boolean).join(' · '); }
+function initializeBirthPlace() {
+  const provinces = window.RegionData || [];
+  if (!provinces.length) return;
+  const provinceSelect = document.getElementById('region-province');
+  const citySelect = document.getElementById('region-city');
+  const areaSelect = document.getElementById('region-area');
+  const sheet = document.getElementById('birth-place-sheet');
+  const search = document.getElementById('region-search');
+  const results = document.getElementById('region-results');
+  const fillCities = (provinceName, chosenCity = '', chosenArea = '') => {
+    const province = provinces.find(item => item.name === provinceName) || provinces[0];
+    const cities = province?.cities || [];
+    renderRegionOptions(citySelect, cities.map(city => ({ value: city.name, label: city.name })), chosenCity);
+    const city = cities.find(item => item.name === citySelect.value) || cities[0];
+    renderRegionOptions(areaSelect, (city?.areas || []).map(area => ({ value: area, label: area })), chosenArea);
+  };
+  const fillProvinces = (provinceName = '北京市', cityName = '', areaName = '') => {
+    renderRegionOptions(provinceSelect, provinces.map(item => ({ value: item.name, label: item.name })), provinceName);
+    fillCities(provinceSelect.value, cityName, areaName);
+  };
+  fillProvinces();
+  provinceSelect.addEventListener('change', () => fillCities(provinceSelect.value));
+  citySelect.addEventListener('change', () => fillCities(provinceSelect.value, citySelect.value));
+  document.getElementById('birth-place-trigger').addEventListener('click', () => {
+    const current = document.getElementById('birth-location').value;
+    const found = provinces.flatMap(province => province.cities.flatMap(city => city.areas.map(area => ({ province, city, area }))))
+      .find(path => regionPathText(path.province.name, path.city.name, path.area) === current);
+    fillProvinces(found?.province.name || '北京市', found?.city.name || '', found?.area || '');
+    search.value = ''; results.replaceChildren(); results.hidden = true; sheet.showModal();
+  });
+  search.addEventListener('input', () => {
+    const query = search.value.trim().toLowerCase(); results.replaceChildren();
+    if (!query) { results.hidden = true; return; }
+    const matches = [];
+    for (const province of provinces) for (const city of province.cities) for (const area of city.areas) {
+      const label = regionPathText(province.name, city.name, area);
+      if (label.toLowerCase().includes(query)) matches.push({ province, city, area, label });
+    }
+    for (const match of matches.slice(0, 24)) {
+      const button = make('button', 'region-result', match.label); button.type = 'button';
+      button.addEventListener('click', () => { fillProvinces(match.province.name, match.city.name, match.area); results.hidden = true; search.value = match.label; });
+      results.append(button);
+    }
+    results.hidden = matches.length === 0;
+  });
+  document.getElementById('birth-place-close').addEventListener('click', () => sheet.close());
+  document.getElementById('birth-place-clear').addEventListener('click', () => { setBirthLocation(''); sheet.close(); });
+  document.getElementById('birth-place-confirm').addEventListener('click', () => {
+    setBirthLocation(regionPathText(provinceSelect.value, citySelect.value, areaSelect.value)); sheet.close();
+  });
 }
 const lunarMonths = ['正月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '冬月', '腊月'];
 function lunarDayName(day) {
@@ -577,6 +659,12 @@ function calculate(input = currentCaseInput()) {
   ];
   return { solar, inputSolar, summerTime, lunar, pillars, shenSha, gates, offset, luck, yunMode, extras, priorJie, daysAfterJie, taiYuan: eight.getTaiYuan(), sect: eight.getSect(), gender: Number(input.gender), name: input.name, input };
 }
+function currentLuckSelection(luck, currentYear) {
+  let luckIndex = luck.slice(0, 11).findIndex(period => period.years.some(item => item.year === currentYear));
+  if (luckIndex < 0) luckIndex = luck.slice(0, 11).findIndex(period => period.ganzhi === '运前');
+  const yearIndex = luckIndex < 0 ? -1 : luck[luckIndex].years.findIndex(item => item.year === currentYear);
+  return { luckIndex: luckIndex < 0 ? null : luckIndex, yearIndex: yearIndex < 0 ? null : yearIndex };
+}
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
 function renderPillarStrip(data, detailed = false) {
@@ -610,7 +698,7 @@ function phaseFor(stem, branch) {
   return LunarUtil.CHANG_SHENG[index];
 }
 function derivedPillar(data, name, ganzhi) {
-  if (!ganzhi || ganzhi === '运前') return { name, placeholder: true };
+  if (!ganzhi || ganzhi === '运前') return { name, placeholder: true, placeholderText: name === '大运' && ganzhi === '运前' ? '交运前' : '' };
   const [stem, branch] = ganzhi;
   const dayStem = data.pillars[2].ganzhi[0];
   const hiddenStems = LunarUtil.ZHI_HIDE_GAN[branch] || [];
@@ -639,7 +727,10 @@ function chartColumns(data) {
 }
 function renderChartCell(pillar, kind) {
   const cell = make('td', `chart-cell cell-${kind}${pillar.placeholder ? ' blank-period' : ''}`);
-  if (pillar.placeholder) return cell;
+  if (pillar.placeholder) {
+    if (kind === 'stem' && pillar.placeholderText) cell.append(make('span', 'preluck-cell', pillar.placeholderText));
+    return cell;
+  }
   if (kind === 'stem' || kind === 'branch') {
     cell.append(colored(pillar.ganzhi[kind === 'stem' ? 0 : 1], 'big-character'));
   } else if (kind === 'hidden') {
@@ -818,11 +909,16 @@ function render(data) {
   document.getElementById('result-date').textContent = `阳历：${solarTime}${data.summerTime ? `（夏令时校正，原输入 ${inputSolarTime}）` : ''}`;
   document.getElementById('term-prior').textContent = `${data.priorJie.name}：${jieTime}`;
   document.getElementById('term-birth').textContent = `出生：${solarTimeChinese}${data.summerTime ? '（夏令时校正后）' : ''}（${data.priorJie.name}后第 ${data.daysAfterJie} 天）`;
+  const monthBranch = data.pillars[1].ganzhi[1];
+  const commandStem = siQuanStem(monthBranch, data.daysAfterJie);
+  const ruling = document.getElementById('term-ruling'); ruling.replaceChildren();
+  if (commandStem) ruling.append(document.createTextNode('司权：'), colored(commandStem, 'siquan-stem'));
+  else ruling.textContent = '司权：未能匹配月令分金';
+  document.getElementById('term-location').textContent = `出生地：${data.input.location || '未知地 · 北京时间'}`;
   const currentYear = Number(beijingNow().year);
-  selectedLuckIndex = data.luck.slice(0, 11).findIndex(period => period.years.some(item => item.year === currentYear));
-  if (selectedLuckIndex < 0) selectedLuckIndex = null;
-  selectedYearIndex = selectedLuckIndex == null ? null : data.luck[selectedLuckIndex].years.findIndex(item => item.year === currentYear);
-  if (selectedYearIndex < 0) selectedYearIndex = null;
+  const selection = currentLuckSelection(data.luck, currentYear);
+  selectedLuckIndex = selection.luckIndex;
+  selectedYearIndex = selection.yearIndex;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
   document.getElementById('chart-empty').hidden = true;
   document.getElementById('current-chart-hint').textContent = `${data.name || '未命名'} · ${solarTime}`;
@@ -839,7 +935,7 @@ function currentCaseInput() {
   const input = { name: value('chart-name'), gender: value('gender'), calendar: value('calendar-type'),
     year: value('year'), month: value('month'), day: value('day'), hour: value('hour'), minute: value('minute'),
     leap: document.getElementById('leap').checked, summerTime: document.getElementById('summer-time').checked,
-    ziRule: value('zi-rule'), yunMode: value('yun-mode') };
+    ziRule: value('zi-rule'), yunMode: value('yun-mode'), location: value('birth-location') };
   return input;
 }
 function showCaseSaveError(error) {
@@ -886,6 +982,8 @@ async function refreshCases() {
       edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M13 3v6h6"/><path d="M8 13h3M8 17h2"/><path d="m14 16 5-5 2 2-5 5-3 1Z"/></svg>';
       nameLine.append(edit);
       details.append(nameLine, make('small', '', item.display.solar));
+      const location = item.input.location || item.display.location;
+      if (location) details.append(make('small', 'case-location', location));
       const pillars = make('span', 'case-pillars');
       for (const part of [0, 1]) {
         const line = make('span', 'case-pillar-line');
@@ -1013,6 +1111,7 @@ async function useSavedCase(id, edit = false) {
     }
     document.getElementById('leap').checked = input.leap;
     document.getElementById('summer-time').checked = input.summerTime;
+    setBirthLocation(input.location || '');
     for (const button of document.querySelectorAll('[data-gender]')) button.setAttribute('aria-pressed', String(button.dataset.gender === input.gender));
     syncCalendarButtons(); updateBirthSummary();
     if (edit) {
@@ -1090,6 +1189,7 @@ function initializeHomeNow() {
   }
 }
 initializeHomeNow();
+initializeBirthPlace();
 
 form.addEventListener('submit', event => {
   event.preventDefault(); error.hidden = true;

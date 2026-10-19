@@ -11,8 +11,8 @@
   --gold: #b58a4d;
 }
 * { box-sizing: border-box; }
-html { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--paper); color: var(--ink); }
-body { margin: 0; }
+html { font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: var(--paper); color: var(--ink); touch-action: manipulation; }
+body { margin: 0; touch-action: manipulation; }
 .shell { max-width: 860px; margin: 0 auto; padding: 22px 16px 36px; }
 .hero { padding: 23px 24px 20px; background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 16px 16px 0 0; }
 .eyebrow { font-size: 11px; letter-spacing: .1em; color: var(--jade); font-weight: 750; }
@@ -192,11 +192,12 @@ body { background: #f2f2f2; }
 .segmented button[aria-pressed="true"], .segmented strong { background: #b99b61; color: #fff; font-weight: 700; }
 .visually-hidden { display: none; }
 .entry-action { cursor: pointer; }
+.entry-action { width: 100%; text-align: left; font: inherit; }
 .entry-row small { color: #bdc0c8; font-size: 11px; }
 .entry-value, .muted-row > span:last-child { display: inline-flex; align-items: center; gap: 7px; color: #bdc0c8; font-size: 14px; text-align: right; }
 .entry-value b, .muted-row b { color: #bbb; font-size: 23px; font-weight: 300; line-height: 1; }
 .muted-row > span:last-child { color: #666; }
-.entry-foot { min-height: 83px; display: flex; justify-content: space-between; align-items: center; gap: 9px; color: #b9bdc6; font-size: 12px; line-height: 1.7; }
+.entry-foot { position: relative; min-height: 47px; display: flex; justify-content: space-between; align-items: center; gap: 9px; color: #b9bdc6; font-size: 12px; line-height: 1.7; }
 .save-label { display: inline-flex; align-items: center; gap: 6px; color: #4c4c4c; font-size: 14px; white-space: nowrap; }
 .save-label i { width: 32px; height: 19px; display: inline-block; border-radius: 15px; background: #e1e1e1; }
 .save-label i::before { content: ''; width: 15px; height: 15px; display: block; margin: 2px; border-radius: 50%; background: #fff; }
@@ -204,10 +205,13 @@ body { background: #f2f2f2; }
 .save-label input:checked + i { background: #b99b61; }
 .save-label input:checked + i::before { transform: translateX(13px); }
 .save-label input:focus-visible + i { outline: 2px solid #222; outline-offset: 2px; }
-.entry-card .settings-panel { border: 0; margin: 0 0 12px; }
-.entry-card .settings-panel summary { padding: 4px 0; color: #a28b61; font-size: 12px; }
+.entry-card .settings-panel { position: relative; border: 0; margin: 0; }
+.entry-card .settings-panel summary { padding: 8px 10px; border: 1px solid #e7e1d7; border-radius: 17px; color: #94703c; font-size: 12px; list-style: none; cursor: pointer; white-space: nowrap; }
+.entry-card .settings-panel summary::-webkit-details-marker { display: none; }
+.entry-card .settings-panel[open] { position: absolute; z-index: 8; right: 0; bottom: calc(100% + 6px); left: 0; padding: 10px 13px; border: 1px solid #e9e3d9; border-radius: 14px; background: #fff; box-shadow: 0 7px 24px #0002; }
 .entry-card .settings-panel .field { margin: 5px 0 10px; }
 .entry-card .settings-panel select { height: 37px; font-size: 13px; }
+.entry-card .settings-panel[open] summary { padding: 3px 0 9px; border: 0; }
 .start-button { display: block; width: 100%; min-height: 53px; border: 0; border-radius: 32px; background: #050505; color: #c7a978; font: 500 20px/1.2 "Songti SC", "Noto Serif CJK SC", serif; cursor: pointer; }
 .instant-card { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 130px; margin-top: 13px; padding: 13px 17px; border-radius: 16px; background: #fff; }
 .instant-pillars { display: flex; gap: 14px; margin-bottom: 5px; }
@@ -256,6 +260,7 @@ body { background: #f2f2f2; }
 .case-details strong { overflow: hidden; max-width: min(170px, 100%); font-size: 15px; white-space: nowrap; text-overflow: ellipsis; }
 .case-gender { flex: none; color: #999; font-size: 12px; }
 .case-details small { color: #697887; font-size: 12px; }
+.case-details .case-location { max-width: 190px; overflow: hidden; color: #a38a67; text-overflow: ellipsis; white-space: nowrap; }
 .case-pillars { display: grid; gap: 1px; flex-shrink: 0; font-size: 18px; font-family: "Songti SC", serif; line-height: 1.1; }
 .case-pillar-line { display: flex; gap: 3px; }
 .case-edit-icon, .case-selector { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #8b7657; cursor: pointer; }
@@ -304,6 +309,9 @@ body { background: #f2f2f2; }
 .result-birth strong { font-size: 15px; }
 .term-brief { padding: 6px 7px 7px; background: #fff; color: #173958; font-size: 11px; line-height: 1.55; }
 .term-brief #term-birth { font-weight: 650; }
+.term-brief #term-ruling { color: #b18851; font-weight: 700; }
+.siquan-stem { font-size: 14px; }
+.preluck-cell { display: inline-block; padding: 3px 2px; border-radius: 4px; background: #f2efe9; color: #9b8057; font-size: 10px; white-space: nowrap; }
 .chart-screen .mode-tabs { margin: 1px 0 2px; }
 .chart-screen .mode-tabs button { padding: 8px 2px; }
 .chart-screen .matrix-scroll { border: 0; }
@@ -312,6 +320,16 @@ body { background: #f2f2f2; }
 .season-wood { background: #239b77; }.season-fire { background: #ff6859; }.season-earth { background: #98794f; }.season-metal { background: #ff9d27; }.season-water { background: #3e78ec; }
 .chart-screen .note { margin-top: 14px; padding-top: 9px; }
 .empty-screen { min-height: calc(100dvh - 132px); background: #fff; }
+.birth-place-sheet .sheet-head { margin-bottom: 13px; }
+.region-search { display: flex; align-items: center; gap: 8px; height: 43px; padding: 0 12px; border-radius: 24px; background: #f4f4f4; color: #aaa; }
+.region-search > span { font-size: 23px; }
+.region-search input { height: 40px; padding: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; }
+.region-selects { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 7px; margin: 16px 0 10px; }
+.region-selects label { min-width: 0; color: #7e7569; font-size: 11px; }
+.region-selects select { width: 100%; height: 42px; margin-top: 5px; padding: 0 5px; font-size: 12px; }
+.region-results { display: grid; max-height: 200px; overflow-y: auto; margin-top: 7px; border: 1px solid #eee; border-radius: 10px; background: #fff; }
+.region-result { min-height: 39px; padding: 7px 11px; border: 0; border-bottom: 1px solid #eee; background: #fff; color: #34495e; font: inherit; font-size: 12px; text-align: left; }
+.region-note { margin: 4px 0 12px; color: #999; font-size: 11px; line-height: 1.55; }
 .sheet-dialog { position: fixed; inset: auto 0 0; width: min(100%, 540px); max-width: none; max-height: min(88dvh, 710px); margin: 0 auto; padding: 20px 20px calc(24px + env(safe-area-inset-bottom)); border: 0; border-radius: 20px 20px 0 0; background: #fff; color: #222; box-shadow: 0 -7px 32px #0002; overflow-y: auto; }
 .sheet-dialog::backdrop { background: #000a; }
 .sheet-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 21px; }

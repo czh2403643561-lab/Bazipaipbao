@@ -5,6 +5,7 @@ window.CaseActions = (() => {
     birth: ['birth', '出生时间', '出生日期', '日期时间'], year: ['year', '年'], month: ['month', '月'],
     day: ['day', '日'], hour: ['hour', '时'], minute: ['minute', '分'], leap: ['leap', '闰月'],
     summerTime: ['summerTime', '夏令时'], ziRule: ['ziRule', '子时换日'], yunMode: ['yunMode', '起运方式'],
+    location: ['location', '出生地点', '出生地', '地址'],
   };
   let pending = null;
 
@@ -47,7 +48,8 @@ window.CaseActions = (() => {
     if (!['year', 'cumulative', 'simple', 'rounded'].includes(yunMode)) throw new Error('起运方式无效');
     const name = String(field(row, 'name') ?? '').trim().slice(0, 80);
     return { name, gender, calendar, ...parts, leap: monthText.startsWith('闰') || flag(field(row, 'leap')),
-      summerTime: flag(field(row, 'summerTime')), ziRule, yunMode };
+      summerTime: flag(field(row, 'summerTime')), ziRule, yunMode,
+      location: String(field(row, 'location') ?? '').trim().slice(0, 120) };
   }
   function signature(input) {
     const normalized = normalize(input);
@@ -60,7 +62,7 @@ window.CaseActions = (() => {
       createdAt: previous?.createdAt || now, updatedAt: now, input,
       display: { name: input.name || '未命名案例', gender: Number(input.gender),
         solar: `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`,
-        pillars: data.pillars.map(pillar => pillar.ganzhi) } };
+        location: input.location, pillars: data.pillars.map(pillar => pillar.ganzhi) } };
   }
   function csvRows(text) {
     const rows = []; let row = []; let cell = ''; let quoted = false;
@@ -213,7 +215,7 @@ window.CaseActions = (() => {
     const to = String(filter.to || '').trim();
     return (await CaseStore.list()).filter(record => {
       const display = record.display;
-      const searchable = `${display.name} ${display.solar} ${display.pillars.join(' ')}`.toLowerCase();
+      const searchable = `${display.name} ${display.solar} ${display.location || ''} ${display.pillars.join(' ')}`.toLowerCase();
       return (!text || searchable.includes(text)) && (gender == null || String(display.gender) === gender)
         && (!pillar || display.pillars.some(item => item.includes(pillar)))
         && (!from || display.solar.slice(0, 10) >= from) && (!to || display.solar.slice(0, 10) <= to);

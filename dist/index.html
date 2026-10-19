@@ -26,13 +26,13 @@
           <select id="calendar-type" class="visually-hidden" aria-hidden="true" tabindex="-1"><option value="solar">公历</option><option value="lunar">农历</option></select>
         </div>
         <button id="birth-trigger" class="entry-row entry-action" type="button"><span>出生时间<small>（必填）</small></span><span class="entry-value"><span id="birth-summary"></span><b>›</b></span></button>
-        <div class="entry-row muted-row"><span>出生地点</span><span>未知地 · 北京时间 <b>›</b></span></div>
+        <button id="birth-place-trigger" class="entry-row entry-action" type="button"><span>出生地点</span><span class="entry-value"><span id="birth-place-summary">未知地 · 北京时间</span><b>›</b></span></button>
+        <input id="birth-location" type="hidden" value="">
         <div class="entry-row muted-row"><span>分组</span><span>全部 <b>›</b></span></div>
-        <div class="entry-foot"><span>真太阳时：暂未启用<br>案例仅保存在此设备</span><label class="save-label">保存 <input id="auto-save" type="checkbox" role="switch"><i aria-hidden="true"></i></label></div>
-        <details class="settings-panel"><summary>排盘设置</summary>
+        <div class="entry-foot"><details class="settings-panel"><summary>排盘设置</summary>
           <label class="field"><span>子时换日</span><select id="zi-rule"><option value="23">23:00 换日（原版默认）</option><option value="24">24:00 换日</option></select></label>
           <label class="field"><span>起运方式</span><select id="yun-mode"><option value="year">按年（原版默认）</option><option value="cumulative">按岁累加</option><option value="simple">按岁简化</option><option value="rounded">按岁舍入</option></select></label>
-        </details>
+        </details><label class="save-label">保存 <input id="auto-save" type="checkbox" role="switch"><i aria-hidden="true"></i></label></div>
         <button class="start-button" type="submit" id="chart-submit">开始排盘</button><button class="cancel-case-edit" id="cancel-case-edit" type="button" hidden>取消编辑</button>
         <p id="error" class="error" role="alert" hidden></p>
       </form>
@@ -49,7 +49,7 @@
       <section class="result" id="result" aria-live="polite" hidden>
         <div class="result-heading"><h2 id="result-title">传统排盘</h2><button id="taiyuan-toggle" class="taiyuan-toggle" type="button" aria-pressed="false">胎元 关</button><button id="edit-birth" type="button">修改出生信息</button><button id="display-trigger" type="button" aria-label="显示设置">⚙</button></div><p id="case-save-feedback" class="case-save-feedback" role="status" hidden></p>
         <div class="result-birth"><strong id="result-qian-kun"></strong><span id="result-lunar"></span><span id="result-date"></span></div>
-        <div class="term-brief"><div id="term-prior"></div><div id="term-birth"></div></div>
+        <div class="term-brief"><div id="term-prior"></div><div id="term-birth"></div><div id="term-ruling"></div><div id="term-location"></div></div>
         <div class="mode-tabs" aria-label="排盘显示方式"><button data-mode="traditional" type="button">传统排盘</button><button data-mode="simple" type="button">精简</button></div>
         <div id="mode-output"></div>
         <p class="note">仅提供排盘数据；部分神煞结果仍在对照原版。</p>
@@ -80,6 +80,14 @@
     <p id="now-status" class="now-status" role="status" hidden></p><p id="date-error" class="error" role="alert" hidden></p>
   </dialog>
 
+  <dialog id="birth-place-sheet" class="sheet-dialog birth-place-sheet"><div class="sheet-head"><h2>出生地点</h2><button id="birth-place-close" type="button" aria-label="关闭">×</button></div>
+    <label class="region-search"><span aria-hidden="true">⌕</span><input id="region-search" type="search" placeholder="搜索省、市或区县" autocomplete="off" aria-label="搜索国内地区"></label>
+    <div id="region-results" class="region-results" hidden></div>
+    <div class="region-selects"><label>省份<select id="region-province"></select></label><label>城市<select id="region-city"></select></label><label>区县<select id="region-area"></select></label></div>
+    <p class="region-note">地区数据随应用保存在本地；当前仅支持国内地区。出生地点仅作资料记录，不参与真太阳时换算。</p>
+    <div class="date-actions"><button id="birth-place-clear" type="button">未知地点</button><button id="birth-place-confirm" type="button">确定</button></div>
+  </dialog>
+
   <dialog id="four-sheet" class="sheet-dialog four-sheet"><div class="sheet-head"><h2>四柱反推</h2><div class="four-actions"><button id="four-confirm" type="button" disabled>确定</button><button id="four-close" type="button" aria-label="关闭">×</button></div></div>
     <div class="four-slot-labels"><span>年柱</span><span>月柱</span><span>日柱</span><span>时柱</span></div>
     <div id="four-slots" class="four-slots" aria-label="四柱选择"></div>
@@ -96,7 +104,7 @@
     <p class="case-import-help">粘贴 CSV 或 JSON，也可以选择文件。先预览，确认后一次存入本机案例。</p>
     <label class="case-file-label">选择 CSV / JSON 文件<input id="case-import-file" type="file" accept=".csv,.json,.txt,text/csv,application/json,text/plain"></label>
     <textarea id="case-import-text" spellcheck="false" placeholder="姓名,性别,出生时间,历法&#10;小明,男,2003-05-16 07:20,公历" aria-label="粘贴案例资料"></textarea>
-    <p class="case-import-help">可填写：姓名、性别、出生时间、历法；农历或特殊设置可另加年、月、日、时、分、闰月、夏令时、子时换日、起运方式列。</p>
+    <p class="case-import-help">可填写：姓名、性别、出生时间、历法、出生地点；农历或特殊设置可另加年、月、日、时、分、闰月、夏令时、子时换日、起运方式列。</p>
     <div class="case-import-actions"><button id="case-import-preview-button" type="button">预览</button><button id="case-import-confirm" type="button" disabled>确认导入</button></div>
     <p id="case-import-status" class="case-import-status" role="status"></p><div id="case-import-preview" class="case-import-preview"></div>
   </dialog>
@@ -105,6 +113,6 @@
     <div class="case-import-actions"><button id="case-restore-confirm" type="button" disabled>确认恢复</button></div>
   </dialog>
   <dialog id="case-delete-sheet" class="sheet-dialog case-delete-sheet"><div class="sheet-head"><h2>确认删除案例</h2><button id="case-delete-close" type="button" aria-label="关闭">×</button></div><p id="case-delete-summary" class="case-import-help"></p><div class="case-import-actions"><button id="case-delete-dismiss" type="button">取消</button><button id="case-delete-commit" type="button">确认删除</button></div></dialog>
-  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="case-store.js"></script><script src="app.js"></script><script src="case-actions.js"></script>
+  <script src="lunar.js"></script><script src="apk-terms-data.js"></script><script src="apk-terms.js"></script><script src="shen-sha.js"></script><script src="region-data.js"></script><script src="case-store.js"></script><script src="app.js"></script><script src="case-actions.js"></script>
 </body>
 </html>
