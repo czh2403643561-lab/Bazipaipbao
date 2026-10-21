@@ -58,11 +58,13 @@ window.CaseActions = (() => {
   function recordFrom(data, previous = null) {
     const input = normalize(data.input);
     const now = Date.now();
-    return { id: previous?.id || `case:${signature(input)}`, schemaVersion: 1,
+    const record = { id: previous?.id || `case:${signature(input)}`, schemaVersion: 1,
       createdAt: previous?.createdAt || now, updatedAt: now, input,
       display: { name: input.name || '未命名案例', gender: Number(input.gender),
         solar: `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`,
         location: input.location, pillars: data.pillars.map(pillar => pillar.ganzhi) } };
+    if (previous?.notes) record.notes = previous.notes;
+    return record;
   }
   function csvRows(text) {
     const rows = []; let row = []; let cell = ''; let quoted = false;
@@ -135,6 +137,19 @@ window.CaseActions = (() => {
     await CaseStore.put(record);
     return record;
   }
+  async function findByInput(input) {
+    const key = signature(input);
+    return (await CaseStore.list()).find(record => signature(record.input) === key) || null;
+  }
+  async function saveNote(id, body) {
+    const existing = await CaseStore.get(id);
+    if (!existing) throw new Error('案例不存在，请重新打开后再保存');
+    const text = String(body ?? '');
+    if (text.length > 50000) throw new Error('笔记最多 50000 个字符');
+    const record = { ...existing, notes: { body: text, updatedAt: Date.now() }, updatedAt: Date.now() };
+    await CaseStore.put(record);
+    return record;
+  }
   async function update(id, changes) {
     const existing = await CaseStore.get(id);
     if (!existing) throw new Error('案例不存在');
@@ -162,49 +177,75 @@ window.CaseActions = (() => {
   async function exportBackup() {
     return JSON.stringify({ format: 'bazi-case-backup', version: 1, exportedAt: new Date().toISOString(), cases: await CaseStore.list() }, null, 2);
   }
+  async function exportResearch(records) {
+    const source = records || await CaseStore.list();
+    const cases = source.map(record => ({
+      name: record.display.name, gender: record.display.gender === 1 ? '男' : '女',
+      birth: record.input, solar: record.display.solar, location: record.display.location || '',
+      pillars: record.display.pillars, note: record.notes?.body || '', noteUpdatedAt: record.notes?.updatedAt || null,
+    }));
+    return JSON.stringify({ format: 'bazi-research-cases', version: 1, exportedAt: new Date().toISOString(), cases }, null, 2);
+  }
   async function previewRestore(source) {
     pending = null;
     let backup;
     try { backup = JSON.parse(String(source).replace(/^\uFEFF/, '')); }
     catch (_) { throw new Error('备份文件不是有效的 JSON'); }
-    if (!backup || backup.format !== 'bazi-case-backup' || backup.version !== 1 || !Array.isArray(backup.cases)) {
-      throw new Error('备份格式或版本不受支持');
-    }
+    const researchFormat = backup?.format === 'bazi-research-cases' && backup.version === 1 && Array.isArray(backup.cases);
+    const backupFormat = backup?.format === 'bazi-case-backup' && backup.version === 1 && Array.isArray(backup.cases);
+    if (!researchFormat && !backupFormat) throw new Error('文件格式或版本不受支持');
     if (backup.cases.length > 5000) throw new Error('备份最多支持5000条案例');
     const existingRecords = await CaseStore.list();
     const existing = new Map(existingRecords.map(record => [signature(record.input), record]));
     const reservedIds = new Set(existingRecords.map(record => record.id));
-    const seen = new Set(); const details = []; const records = [];
+    const seen = new Set(); const details = []; const records = []; const updates = new Map();
     for (let index = 0; index < backup.cases.length; index++) {
       const sourceRecord = backup.cases[index];
       try {
-        if (!sourceRecord || typeof sourceRecord !== 'object' || !sourceRecord.input) throw new Error('缺少出生资料');
-        const input = normalize(sourceRecord.input);
+        if (!sourceRecord || typeof sourceRecord !== 'object' || !(sourceRecord.input || sourceRecord.birth)) throw new Error('缺少出生资料');
+        const input = normalize(sourceRecord.input || sourceRecord.birth);
         const key = signature(input);
         const label = input.name || `${input.year}-${input.month}-${input.day}`;
         if (existing.has(key) || seen.has(key)) {
-          details.push({ row: index + 1, label, status: 'duplicate', message: '已存在或备份内重复，恢复时跳过' });
+          const local = existing.get(key);
+          const incomingNote = sourceRecord.notes?.body ?? sourceRecord.note;
+          if (local && incomingNote != null && String(incomingNote) !== (local.notes?.body || '')) {
+            if (String(incomingNote).length > 50000) throw new Error('笔记超过50000个字符');
+            updates.set(local.id, { ...local, notes: String(incomingNote) ? {
+              body: String(incomingNote), updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()),
+            } : undefined, updatedAt: Date.now() });
+            details.push({ row: index + 1, label, status: 'conflict', id: local.id, message: '本机与文件的笔记不同，可选择用文件笔记覆盖' });
+          } else details.push({ row: index + 1, label, status: 'duplicate', message: '案例已存在，保留本机内容' });
           continue;
         }
         const record = recordFrom(calculate(input));
+        const noteBody = sourceRecord.notes?.body ?? sourceRecord.note ?? '';
+        if (String(noteBody).length > 50000) throw new Error('笔记超过50000个字符');
+        if (noteBody) record.notes = { body: String(noteBody), updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()) };
         if (typeof sourceRecord.id === 'string' && sourceRecord.id && !reservedIds.has(sourceRecord.id)) record.id = sourceRecord.id;
         else if (reservedIds.has(record.id)) record.id = `case:restore:${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`}`;
         if (Number.isFinite(sourceRecord.createdAt)) record.createdAt = sourceRecord.createdAt;
         if (Number.isFinite(sourceRecord.updatedAt)) record.updatedAt = sourceRecord.updatedAt;
         records.push(record); seen.add(key); reservedIds.add(record.id);
-        details.push({ row: index + 1, label, status: 'new', message: record.display.pillars.join(' ') });
+        details.push({ row: index + 1, label, status: 'new', message: `${record.display.pillars.join(' ')}${record.notes?.body ? ' · 含笔记' : ''}` });
       } catch (error) {
         details.push({ row: index + 1, label: `第${index + 1}条`, status: 'error', message: error.message || '出生资料无效' });
       }
     }
-    pending = { kind: 'restore', records };
+    pending = { kind: 'restore', records, updates, selectedUpdates: new Set() };
     return { total: backup.cases.length, added: records.length,
       duplicate: details.filter(item => item.status === 'duplicate').length,
+      conflicts: details.filter(item => item.status === 'conflict').length,
       error: details.filter(item => item.status === 'error').length, details };
+  }
+  function selectRestoreUpdate(id, selected) {
+    if (!pending || pending.kind !== 'restore' || !pending.updates.has(id)) throw new Error('该案例没有可应用的笔记修改');
+    if (selected) pending.selectedUpdates.add(id); else pending.selectedUpdates.delete(id);
+    return pending.records.length + pending.selectedUpdates.size;
   }
   async function commitRestore() {
     if (!pending || pending.kind !== 'restore') throw new Error('请先预览备份');
-    const records = pending.records; pending = null;
+    const records = [...pending.records, ...[...pending.selectedUpdates].map(id => pending.updates.get(id))]; pending = null;
     return CaseStore.putMany(records);
   }
   async function search(filter = {}) {
@@ -215,11 +256,11 @@ window.CaseActions = (() => {
     const to = String(filter.to || '').trim();
     return (await CaseStore.list()).filter(record => {
       const display = record.display;
-      const searchable = `${display.name} ${display.solar} ${display.location || ''} ${display.pillars.join(' ')}`.toLowerCase();
+      const searchable = `${display.name} ${display.solar} ${display.location || ''} ${display.pillars.join(' ')} ${record.notes?.body || ''}`.toLowerCase();
       return (!text || searchable.includes(text)) && (gender == null || String(display.gender) === gender)
         && (!pillar || display.pillars.some(item => item.includes(pillar)))
         && (!from || display.solar.slice(0, 10) >= from) && (!to || display.solar.slice(0, 10) <= to);
     });
   }
-  return { normalize, search, previewImport, commitImport, previewRestore, commitRestore, exportBackup, saveCalculated, update, remove, removeMany };
+  return { normalize, search, previewImport, commitImport, previewRestore, selectRestoreUpdate, commitRestore, exportBackup, exportResearch, saveCalculated, findByInput, saveNote, update, remove, removeMany };
 })();

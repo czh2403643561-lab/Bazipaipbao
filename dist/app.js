@@ -6,6 +6,10 @@ const calendarType = document.getElementById('calendar-type');
 const modeOutput = document.getElementById('mode-output');
 const nowStatus = document.getElementById('now-status');
 let latestData = null;
+let favoriteEpoch = 0;
+let activeNoteCaseId = null;
+let savedNoteSnapshot = '';
+let noteSaveTimer = null;
 let editingCaseId = null;
 let activeMode = 'traditional';
 let selectedLuckIndex = null;
@@ -920,13 +924,14 @@ function render(data) {
   selectedLuckIndex = selection.luckIndex;
   selectedYearIndex = selection.yearIndex;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
+  syncFavoriteButton(data);
   document.getElementById('chart-empty').hidden = true;
   document.getElementById('current-chart-hint').textContent = `${data.name || '未命名'} · ${solarTime}`;
   showScreen('chart');
   const feedback = document.getElementById('case-save-feedback');
   feedback.hidden = true;
   if (autoSave.checked && !openingSavedCase && !editingCaseId) saveCurrentCase(data)
-    .then(() => { feedback.textContent = '已保存到本机案例'; feedback.hidden = false; })
+    .then(() => { feedback.textContent = '已保存到本机案例'; feedback.hidden = false; syncFavoriteButton(data); })
     .catch(error => { showCaseSaveError(error); feedback.textContent = '案例保存失败，请检查本机储存权限'; feedback.hidden = false; });
 }
 
@@ -944,8 +949,104 @@ function showCaseSaveError(error) {
   message.hidden = false;
 }
 async function saveCurrentCase(data) {
-  await CaseActions.saveCalculated(data);
+  return CaseActions.saveCalculated(data);
 }
+async function syncFavoriteButton(data = latestData) {
+  const button = document.getElementById('case-favorite');
+  const epoch = ++favoriteEpoch;
+  if (!data) { button.disabled = true; button.textContent = '☆'; button.setAttribute('aria-pressed', 'false'); return; }
+  button.disabled = true;
+  try {
+    const record = await CaseActions.findByInput(data.input);
+    if (epoch !== favoriteEpoch || latestData !== data) return;
+    button.dataset.caseId = record?.id || '';
+    button.textContent = record ? '★' : '☆';
+    button.setAttribute('aria-pressed', String(Boolean(record)));
+    button.setAttribute('aria-label', record ? '已收藏，点击写笔记' : '收藏当前排盘');
+    button.title = record ? '已收藏，点击写笔记' : '收藏当前排盘';
+  } catch (_) { button.dataset.caseId = ''; button.textContent = '☆'; }
+  finally { if (epoch === favoriteEpoch) button.disabled = false; }
+}
+
+function noteSummary(record) {
+  return `${record.display.name} · ${record.display.gender === 1 ? '男' : '女'} · ${record.display.solar}\n${record.display.pillars.join('　')}`;
+}
+async function openCaseNote(id) {
+  try {
+    const record = await CaseStore.get(id);
+    if (!record) throw new Error('案例不存在，请刷新列表后重试');
+    activeNoteCaseId = record.id;
+    savedNoteSnapshot = record.notes?.body || '';
+    document.getElementById('case-note-summary').textContent = noteSummary(record);
+    const body = document.getElementById('case-note-body'); body.value = savedNoteSnapshot;
+    document.getElementById('case-note-status').textContent = record.notes?.updatedAt
+      ? `上次保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}` : '新笔记会保存在此设备';
+    document.getElementById('case-note-sheet').showModal();
+    setTimeout(() => body.focus({ preventScroll: true }), 80);
+  } catch (exception) { showCaseSaveError(exception); }
+}
+async function openCurrentNote() {
+  if (!latestData) return;
+  try {
+    const record = await CaseActions.findByInput(latestData.input) || await CaseActions.saveCalculated(latestData);
+    await openCaseNote(record.id);
+    syncFavoriteButton(latestData);
+  } catch (exception) { showCaseSaveError(exception); }
+}
+async function saveOpenNote() {
+  if (!activeNoteCaseId) throw new Error('请先选择案例');
+  clearTimeout(noteSaveTimer); noteSaveTimer = null;
+  const body = document.getElementById('case-note-body').value;
+  document.getElementById('case-note-status').textContent = '正在保存…';
+  const record = await CaseActions.saveNote(activeNoteCaseId, body);
+  savedNoteSnapshot = record.notes.body;
+  document.getElementById('case-note-status').textContent = `已保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}`;
+  await refreshCases();
+  return record;
+}
+async function closeCaseNote() {
+  if (document.getElementById('case-note-body').value !== savedNoteSnapshot) {
+    try { await saveOpenNote(); }
+    catch (exception) { document.getElementById('case-note-status').textContent = `保存失败：${exception.message || '请重试'}`; return; }
+  }
+  document.getElementById('case-note-sheet').close();
+}
+document.getElementById('case-favorite').addEventListener('click', async () => {
+  if (!latestData) return;
+  const button = document.getElementById('case-favorite'); button.disabled = true;
+  try {
+    const existing = await CaseActions.findByInput(latestData.input);
+    if (existing) { await openCaseNote(existing.id); return; }
+    const record = await CaseActions.saveCalculated(latestData);
+    button.dataset.caseId = record.id; button.textContent = '★'; button.setAttribute('aria-pressed', 'true');
+    button.setAttribute('aria-label', '已收藏，点击写笔记'); button.title = '已收藏，点击写笔记';
+    const feedback = document.getElementById('case-save-feedback'); feedback.textContent = '已收藏到本机案例'; feedback.hidden = false;
+  } catch (exception) { showCaseSaveError(exception); }
+  finally { button.disabled = false; }
+});
+document.getElementById('case-note-open').addEventListener('click', openCurrentNote);
+document.getElementById('case-note-close').addEventListener('click', closeCaseNote);
+document.getElementById('case-note-sheet').addEventListener('cancel', event => { event.preventDefault(); closeCaseNote(); });
+document.getElementById('case-note-body').addEventListener('input', () => {
+  const status = document.getElementById('case-note-status'); status.textContent = '正在编辑…';
+  clearTimeout(noteSaveTimer);
+  noteSaveTimer = setTimeout(() => saveOpenNote().catch(exception => {
+    status.textContent = `自动保存失败：${exception.message || '请手动保存'}`;
+  }), 900);
+});
+document.getElementById('case-note-save').addEventListener('click', async () => {
+  try { await saveOpenNote(); } catch (exception) { document.getElementById('case-note-status').textContent = `保存失败：${exception.message || '请重试'}`; }
+});
+document.getElementById('case-note-next').addEventListener('click', async () => {
+  try {
+    await saveOpenNote(); document.getElementById('case-note-sheet').close();
+    editingCaseId = null; document.getElementById('chart-submit').textContent = '开始排盘';
+    document.getElementById('cancel-case-edit').hidden = true;
+    document.getElementById('chart-name').value = '';
+    showScreen('home');
+    const yearInput = document.getElementById('year'); yearInput.focus({ preventScroll: true }); yearInput.select?.();
+  } catch (exception) { document.getElementById('case-note-status').textContent = `保存失败，暂未离开：${exception.message || '请重试'}`; }
+});
 let caseDeleteMode = false;
 const selectedCaseIds = new Set();
 function syncCaseDeleteControls() {
@@ -980,7 +1081,9 @@ async function refreshCases() {
       const edit = make('button', 'case-edit-icon'); edit.type = 'button'; edit.dataset.caseEdit = 'true';
       edit.setAttribute('aria-label', `编辑${item.display.name}`);
       edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M13 3v6h6"/><path d="M8 13h3M8 17h2"/><path d="m14 16 5-5 2 2-5 5-3 1Z"/></svg>';
-      nameLine.append(edit);
+      const note = make('button', `case-note-link${item.notes?.body ? ' has-note' : ''}`, item.notes?.body ? '有笔记' : '笔记');
+      note.type = 'button'; note.dataset.caseNote = 'true'; note.setAttribute('aria-label', `打开${item.display.name}的研究笔记`);
+      nameLine.append(edit, note);
       details.append(nameLine, make('small', '', item.display.solar));
       const location = item.input.location || item.display.location;
       if (location) details.append(make('small', 'case-location', location));
@@ -1064,6 +1167,19 @@ const caseRestoreSheet = document.getElementById('case-restore-sheet');
 const caseBackupFile = document.getElementById('case-backup-file');
 const caseRestoreStatus = document.getElementById('case-restore-status');
 const caseRestoreConfirm = document.getElementById('case-restore-confirm');
+document.getElementById('case-research-export').addEventListener('click', async () => {
+  try {
+    const records = await CaseActions.search({ text: document.getElementById('case-search-input').value,
+      gender: document.getElementById('case-gender-filter').value, pillar: document.getElementById('case-pillar-filter').value });
+    if (!records.length) { showCaseSaveError(new Error('当前没有可导出的案例')); return; }
+    const payload = await CaseActions.exportResearch(records);
+    const url = URL.createObjectURL(new Blob([payload], { type: 'application/json;charset=utf-8' }));
+    const link = document.createElement('a'); link.href = url;
+    link.download = `八字研究资料-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    document.getElementById('cases-error').hidden = true;
+  } catch (exception) { showCaseSaveError(exception); }
+});
 document.getElementById('case-backup-export').addEventListener('click', async () => {
   try {
     const backup = await CaseActions.exportBackup();
@@ -1083,12 +1199,22 @@ caseBackupFile.addEventListener('change', async event => {
   caseRestoreSheet.showModal();
   try {
     const preview = await CaseActions.previewRestore(await file.text());
-    caseRestoreStatus.textContent = `共 ${preview.total} 条：可恢复 ${preview.added} 条，重复 ${preview.duplicate} 条，错误 ${preview.error} 条`;
+    caseRestoreStatus.textContent = `共 ${preview.total} 条：新增 ${preview.added} 条，重复 ${preview.duplicate} 条，笔记冲突 ${preview.conflicts || 0} 条，错误 ${preview.error} 条`;
     caseRestoreConfirm.disabled = preview.added === 0;
     const box = document.getElementById('case-restore-preview');
     for (const item of preview.details) {
       const row = make('div', `case-import-row ${item.status}`);
-      row.append(make('strong', '', `${item.row}. ${item.label}`), make('span', '', item.message)); box.append(row);
+      row.append(make('strong', '', `${item.row}. ${item.label}`), make('span', '', item.message));
+      if (item.status === 'conflict') {
+        const label = make('label', 'case-restore-choice');
+        const choice = make('input'); choice.type = 'checkbox'; choice.setAttribute('aria-label', `用文件中的笔记覆盖${item.label}的本机笔记`);
+        choice.addEventListener('change', () => {
+          const writes = CaseActions.selectRestoreUpdate(item.id, choice.checked);
+          caseRestoreConfirm.disabled = writes === 0;
+        });
+        label.append(choice, document.createTextNode('用文件笔记覆盖本机笔记')); row.append(label);
+      }
+      box.append(row);
     }
   } catch (exception) { caseRestoreStatus.textContent = exception.message || '无法读取备份'; }
   finally { caseBackupFile.value = ''; }
@@ -1097,7 +1223,7 @@ caseRestoreConfirm.addEventListener('click', async () => {
   caseRestoreConfirm.disabled = true;
   try {
     const count = await CaseActions.commitRestore();
-    caseRestoreStatus.textContent = `已恢复 ${count} 条案例`;
+    caseRestoreStatus.textContent = `已新增或更新 ${count} 条案例`;
     await refreshCases();
   } catch (exception) { caseRestoreStatus.textContent = exception.message || '恢复失败'; }
 });
@@ -1136,6 +1262,7 @@ document.getElementById('cases-list').addEventListener('click', event => {
     syncCaseDeleteControls(); return;
   }
   if (event.target.closest('[data-case-edit]')) { useSavedCase(row.dataset.caseId, true); return; }
+  if (event.target.closest('[data-case-note]')) { openCaseNote(row.dataset.caseId); return; }
   useSavedCase(row.dataset.caseId);
 });
 document.getElementById('cases-list').addEventListener('keydown', event => {
@@ -1203,7 +1330,7 @@ form.addEventListener('submit', event => {
         document.getElementById('cancel-case-edit').hidden = true;
         document.getElementById('case-save-feedback').textContent = '案例已更新';
         document.getElementById('case-save-feedback').hidden = false;
-        refreshCases();
+        refreshCases(); syncFavoriteButton(latestData);
       }).catch(exception => {
         const feedback = document.getElementById('case-save-feedback');
         feedback.textContent = `案例未保存：${exception.message || '更新失败'}`; feedback.hidden = false;
