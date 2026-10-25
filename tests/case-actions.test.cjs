@@ -66,9 +66,14 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal((await context.CaseActions.search({ gender: '1', pillar: saved.display.pillars[0] })).length, 1);
   const noteSaved = await context.CaseActions.saveNote(saved.id, '研究记录：留意大运交接');
   assert.equal(noteSaved.notes.body, '研究记录：留意大运交接');
+  const analyzed = await context.CaseActions.saveAnalysis(saved.id, { summary: '癸丑运发家，后因合伙受挫', body: noteSaved.notes.body });
+  assert.equal(analyzed.notes.summary, '癸丑运发家，后因合伙受挫');
+  assert.equal((await context.CaseActions.search({ text: '合伙受挫' })).length, 1, 'case search includes analysis summary');
   assert.equal((await context.CaseActions.search({ text: '大运交接' })).length, 1, 'case search includes notes');
-  const research = JSON.parse(await context.CaseActions.exportResearch([noteSaved]));
+  const research = JSON.parse(await context.CaseActions.exportResearch([analyzed]));
   assert.equal(research.format, 'bazi-research-cases');
+  assert.equal(research.version, 2);
+  assert.equal(research.cases[0].summary, '癸丑运发家，后因合伙受挫');
   assert.equal(research.cases[0].note, '研究记录：留意大运交接');
   const again = await context.CaseActions.previewImport('[{"姓名":"小明","性别":"男","出生时间":"2003-05-16 07:20"}]');
   assert.equal(again.duplicate, 1);
@@ -85,6 +90,7 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal(edited.display.name, '小明（已核对）');
   assert.equal(edited.id, saved.id);
   assert.equal(edited.notes.body, '研究记录：留意大运交接', 'editing birth details must preserve notes');
+  assert.equal(edited.notes.summary, '癸丑运发家，后因合伙受挫', 'editing birth details must preserve analysis summary');
   const changedResearch = JSON.parse(await context.CaseActions.exportResearch([edited]));
   changedResearch.cases[0].note = '外部整理后的笔记';
   const conflict = await context.CaseActions.previewRestore(JSON.stringify(changedResearch));
@@ -92,6 +98,7 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal(context.CaseActions.selectRestoreUpdate(saved.id, true), 1);
   assert.equal(await context.CaseActions.commitRestore(), 1);
   assert.equal((await context.CaseActions.findByInput(edited.input)).notes.body, '外部整理后的笔记');
+  assert.equal((await context.CaseActions.findByInput(edited.input)).notes.summary, '癸丑运发家，后因合伙受挫');
   const backup = await context.CaseActions.exportBackup();
   const backupData = JSON.parse(backup);
   assert.equal(backupData.format, 'bazi-case-backup');
@@ -100,6 +107,16 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal(researchRestore.added, 1, 'research export can be imported back');
   assert.equal(await context.CaseActions.commitRestore(), 1);
   assert.equal([...records.values()][0].notes.body, '研究记录：留意大运交接');
+  assert.equal([...records.values()][0].notes.summary, '癸丑运发家，后因合伙受挫');
+  const summaryChange = structuredClone(research);
+  summaryChange.cases[0].summary = '流年反复验证';
+  assert.equal((await context.CaseActions.previewRestore(JSON.stringify(summaryChange))).conflicts, 1, 'summary changes require explicit conflict resolution');
+  assert.equal(await context.CaseActions.commitRestore(), 0, 'unselected conflict preserves local analysis');
+  assert.equal([...records.values()][0].notes.summary, '癸丑运发家，后因合伙受挫');
+  const legacyResearch = structuredClone(research);
+  legacyResearch.version = 1;
+  delete legacyResearch.cases[0].summary;
+  assert.equal((await context.CaseActions.previewRestore(JSON.stringify(legacyResearch))).duplicate, 1, 'older exports without summary remain importable');
   records.clear();
   const restore = await context.CaseActions.previewRestore(backup);
   assert.equal(restore.added, 2);
@@ -107,6 +124,7 @@ for (const file of ['app.js', 'case-actions.js']) vm.runInContext(fs.readFileSyn
   assert.equal(await context.CaseActions.commitRestore(), 2);
   assert.equal(records.size, 2);
   assert.equal([...records.values()].find(record => record.display.name === '小明（已核对）').notes.body, '外部整理后的笔记', 'backup restore preserves notes');
+  assert.equal([...records.values()].find(record => record.display.name === '小明（已核对）').notes.summary, '癸丑运发家，后因合伙受挫', 'backup restore preserves summary');
   assert.equal((await context.CaseActions.previewRestore(backup)).duplicate, 2);
   const restored = [...records.values()].find(record => record.display.name === '小明（已核对）');
   assert.equal(restored.display.pillars.length, 4);

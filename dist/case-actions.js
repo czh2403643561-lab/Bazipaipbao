@@ -141,14 +141,20 @@ window.CaseActions = (() => {
     const key = signature(input);
     return (await CaseStore.list()).find(record => signature(record.input) === key) || null;
   }
+  async function saveAnalysis(id, { summary = '', body = '' } = {}) {
+    const existing = await CaseStore.get(id);
+    if (!existing) throw new Error('案例不存在，请重新打开后再保存');
+    const synopsis = String(summary ?? '');
+    const text = String(body ?? '');
+    if (synopsis.length > 50000 || text.length > 50000) throw new Error('单项分析内容最多 50000 个字符');
+    const record = { ...existing, notes: { ...existing.notes, summary: synopsis, body: text, updatedAt: Date.now() }, updatedAt: Date.now() };
+    await CaseStore.put(record);
+    return record;
+  }
   async function saveNote(id, body) {
     const existing = await CaseStore.get(id);
     if (!existing) throw new Error('案例不存在，请重新打开后再保存');
-    const text = String(body ?? '');
-    if (text.length > 50000) throw new Error('笔记最多 50000 个字符');
-    const record = { ...existing, notes: { body: text, updatedAt: Date.now() }, updatedAt: Date.now() };
-    await CaseStore.put(record);
-    return record;
+    return saveAnalysis(id, { summary: existing.notes?.summary || '', body });
   }
   async function update(id, changes) {
     const existing = await CaseStore.get(id);
@@ -182,16 +188,16 @@ window.CaseActions = (() => {
     const cases = source.map(record => ({
       name: record.display.name, gender: record.display.gender === 1 ? '男' : '女',
       birth: record.input, solar: record.display.solar, location: record.display.location || '',
-      pillars: record.display.pillars, note: record.notes?.body || '', noteUpdatedAt: record.notes?.updatedAt || null,
+      pillars: record.display.pillars, summary: record.notes?.summary || '', note: record.notes?.body || '', noteUpdatedAt: record.notes?.updatedAt || null,
     }));
-    return JSON.stringify({ format: 'bazi-research-cases', version: 1, exportedAt: new Date().toISOString(), cases }, null, 2);
+    return JSON.stringify({ format: 'bazi-research-cases', version: 2, exportedAt: new Date().toISOString(), cases }, null, 2);
   }
   async function previewRestore(source) {
     pending = null;
     let backup;
     try { backup = JSON.parse(String(source).replace(/^\uFEFF/, '')); }
     catch (_) { throw new Error('备份文件不是有效的 JSON'); }
-    const researchFormat = backup?.format === 'bazi-research-cases' && backup.version === 1 && Array.isArray(backup.cases);
+    const researchFormat = backup?.format === 'bazi-research-cases' && [1, 2].includes(backup.version) && Array.isArray(backup.cases);
     const backupFormat = backup?.format === 'bazi-case-backup' && backup.version === 1 && Array.isArray(backup.cases);
     if (!researchFormat && !backupFormat) throw new Error('文件格式或版本不受支持');
     if (backup.cases.length > 5000) throw new Error('备份最多支持5000条案例');
@@ -209,25 +215,30 @@ window.CaseActions = (() => {
         if (existing.has(key) || seen.has(key)) {
           const local = existing.get(key);
           const incomingNote = sourceRecord.notes?.body ?? sourceRecord.note;
-          if (local && incomingNote != null && String(incomingNote) !== (local.notes?.body || '')) {
-            if (String(incomingNote).length > 50000) throw new Error('笔记超过50000个字符');
-            updates.set(local.id, { ...local, notes: String(incomingNote) ? {
-              body: String(incomingNote), updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()),
-            } : undefined, updatedAt: Date.now() });
-            details.push({ row: index + 1, label, status: 'conflict', id: local.id, message: '本机与文件的笔记不同，可选择用文件笔记覆盖' });
+          const incomingSummary = sourceRecord.notes?.summary ?? sourceRecord.summary;
+          if (local && ((incomingNote != null && String(incomingNote) !== (local.notes?.body || ''))
+            || (incomingSummary != null && String(incomingSummary) !== (local.notes?.summary || '')))) {
+            if (String(incomingNote ?? '').length > 50000 || String(incomingSummary ?? '').length > 50000) throw new Error('分析内容超过50000个字符');
+            updates.set(local.id, { ...local, notes: {
+              ...local.notes, body: incomingNote == null ? local.notes?.body || '' : String(incomingNote),
+              summary: incomingSummary == null ? local.notes?.summary || '' : String(incomingSummary),
+              updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()),
+            }, updatedAt: Date.now() });
+            details.push({ row: index + 1, label, status: 'conflict', id: local.id, message: '本机与文件的分析内容不同，可选择用文件内容覆盖' });
           } else details.push({ row: index + 1, label, status: 'duplicate', message: '案例已存在，保留本机内容' });
           continue;
         }
         const record = recordFrom(calculate(input));
         const noteBody = sourceRecord.notes?.body ?? sourceRecord.note ?? '';
-        if (String(noteBody).length > 50000) throw new Error('笔记超过50000个字符');
-        if (noteBody) record.notes = { body: String(noteBody), updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()) };
+        const noteSummary = sourceRecord.notes?.summary ?? sourceRecord.summary ?? '';
+        if (String(noteBody).length > 50000 || String(noteSummary).length > 50000) throw new Error('分析内容超过50000个字符');
+        if (noteBody || noteSummary) record.notes = { summary: String(noteSummary), body: String(noteBody), updatedAt: Number(sourceRecord.notes?.updatedAt || sourceRecord.noteUpdatedAt || Date.now()) };
         if (typeof sourceRecord.id === 'string' && sourceRecord.id && !reservedIds.has(sourceRecord.id)) record.id = sourceRecord.id;
         else if (reservedIds.has(record.id)) record.id = `case:restore:${globalThis.crypto?.randomUUID?.() || `${Date.now()}-${index}-${Math.random().toString(36).slice(2)}`}`;
         if (Number.isFinite(sourceRecord.createdAt)) record.createdAt = sourceRecord.createdAt;
         if (Number.isFinite(sourceRecord.updatedAt)) record.updatedAt = sourceRecord.updatedAt;
         records.push(record); seen.add(key); reservedIds.add(record.id);
-        details.push({ row: index + 1, label, status: 'new', message: `${record.display.pillars.join(' ')}${record.notes?.body ? ' · 含笔记' : ''}` });
+        details.push({ row: index + 1, label, status: 'new', message: `${record.display.pillars.join(' ')}${record.notes?.body || record.notes?.summary ? ' · 含分析' : ''}` });
       } catch (error) {
         details.push({ row: index + 1, label: `第${index + 1}条`, status: 'error', message: error.message || '出生资料无效' });
       }
@@ -239,7 +250,7 @@ window.CaseActions = (() => {
       error: details.filter(item => item.status === 'error').length, details };
   }
   function selectRestoreUpdate(id, selected) {
-    if (!pending || pending.kind !== 'restore' || !pending.updates.has(id)) throw new Error('该案例没有可应用的笔记修改');
+    if (!pending || pending.kind !== 'restore' || !pending.updates.has(id)) throw new Error('该案例没有可应用的分析修改');
     if (selected) pending.selectedUpdates.add(id); else pending.selectedUpdates.delete(id);
     return pending.records.length + pending.selectedUpdates.size;
   }
@@ -256,11 +267,11 @@ window.CaseActions = (() => {
     const to = String(filter.to || '').trim();
     return (await CaseStore.list()).filter(record => {
       const display = record.display;
-      const searchable = `${display.name} ${display.solar} ${display.location || ''} ${display.pillars.join(' ')} ${record.notes?.body || ''}`.toLowerCase();
+      const searchable = `${display.name} ${display.solar} ${display.location || ''} ${display.pillars.join(' ')} ${record.notes?.summary || ''} ${record.notes?.body || ''}`.toLowerCase();
       return (!text || searchable.includes(text)) && (gender == null || String(display.gender) === gender)
         && (!pillar || display.pillars.some(item => item.includes(pillar)))
         && (!from || display.solar.slice(0, 10) >= from) && (!to || display.solar.slice(0, 10) <= to);
     });
   }
-  return { normalize, search, previewImport, commitImport, previewRestore, selectRestoreUpdate, commitRestore, exportBackup, exportResearch, saveCalculated, findByInput, saveNote, update, remove, removeMany };
+  return { normalize, search, previewImport, commitImport, previewRestore, selectRestoreUpdate, commitRestore, exportBackup, exportResearch, saveCalculated, findByInput, saveAnalysis, saveNote, update, remove, removeMany };
 })();

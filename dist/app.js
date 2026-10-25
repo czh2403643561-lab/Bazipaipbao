@@ -7,9 +7,11 @@ const modeOutput = document.getElementById('mode-output');
 const nowStatus = document.getElementById('now-status');
 let latestData = null;
 let favoriteEpoch = 0;
-let activeNoteCaseId = null;
-let savedNoteSnapshot = '';
-let noteSaveTimer = null;
+let activeAnalysisCaseId = null;
+let savedAnalysisSnapshot = { summary: '', body: '' };
+let analysisSaveTimer = null;
+let analysisSavePromise = Promise.resolve();
+let analysisLoadEpoch = 0;
 let editingCaseId = null;
 let activeMode = 'traditional';
 let selectedLuckIndex = null;
@@ -48,6 +50,9 @@ const fourSheet = document.getElementById('four-sheet');
 const displaySheet = document.getElementById('display-sheet');
 
 function showScreen(name) {
+  if (name !== 'chart' && analysisChanged()) saveOpenAnalysis().catch(exception => {
+    document.getElementById('analysis-status').textContent = `保存失败：${exception.message || '请重试'}`;
+  });
   for (const screen of document.querySelectorAll('.app-screen')) screen.hidden = screen.id !== `${name}-screen`;
   for (const button of document.querySelectorAll('[data-nav]')) {
     if (button.dataset.nav === name || (name === 'chart' && button.dataset.nav === 'home')) button.setAttribute('aria-current', 'page');
@@ -288,6 +293,10 @@ document.querySelector('.mode-tabs').addEventListener('click', event => {
   if (!button || !latestData) return;
   activeMode = button.dataset.mode;
   renderMode(latestData, button.dataset.mode);
+  if (activeMode === 'analysis') loadAnalysis(latestData);
+  else if (analysisChanged()) saveOpenAnalysis().catch(exception => {
+    document.getElementById('analysis-status').textContent = `保存失败：${exception.message || '请重试'}`;
+  });
 });
 document.querySelector('.display-settings').addEventListener('change', () => { if (latestData) renderMode(latestData, activeMode); });
 document.getElementById('taiyuan-toggle').addEventListener('click', event => {
@@ -671,19 +680,6 @@ function currentLuckSelection(luck, currentYear) {
 }
 
 function heading(text, className = 'block-title') { return make('h3', className, text); }
-function renderPillarStrip(data, detailed = false) {
-  const box = make('div', detailed ? 'pillar-strip detailed-strip' : 'pillar-strip');
-  for (const pillar of data.pillars) {
-    const card = make('article', 'pillar-card');
-    card.append(make('span', 'pillar-label', pillar.name), make('strong', 'ganzhi', pillar.ganzhi));
-    if (detailed) {
-      card.append(make('span', 'small-god', pillar.shishen));
-      if (shown('show-nayin')) card.append(make('span', 'small-nayin', pillar.nayin));
-    }
-    box.append(card);
-  }
-  return box;
-}
 function elementClass(character) {
   if ('甲乙寅卯'.includes(character)) return 'wood';
   if ('丙丁巳午'.includes(character)) return 'fire';
@@ -860,47 +856,43 @@ function renderInteractiveLuck(data) {
   }
   return section;
 }
-function renderLuck(data) {
-  const section = make('section', 'luck-section');
-  const modeLabels = { year: '按年（原版默认）', cumulative: '按岁累加', simple: '按岁简化', rounded: '按岁舍入' };
-  section.append(heading('大运与流年'), make('p', 'luck-start', `出生后约 ${data.offset.years} 年 ${data.offset.months} 个月 ${data.offset.days} 天起运 · ${modeLabels[data.yunMode] || modeLabels.year}`));
-  const list = make('div', 'luck-list');
-  list.style.gridTemplateColumns = `repeat(${data.luck.length}, minmax(0, 1fr))`;
-  for (const item of data.luck) {
-    const card = make('article', 'luck-item'); card.setAttribute('role', 'listitem');
-    const header = make('header', 'luck-head');
-    header.append(make('span', 'luck-label', item.ganzhi === '运前' ? '交运前' : '大运'), make('strong', '', item.ganzhi), make('span', 'luck-start-age', `${item.startAge}岁起`), make('span', 'luck-start-year', String(item.startYear))); card.append(header);
-    const years = make('div', 'annual-list');
-    for (const year of item.years) {
-      const row = make('div', 'annual-year');
-      row.append(make('span', '', String(year.year)), make('strong', '', year.ganzhi));
-      years.append(row);
-    }
-    card.append(years); list.append(card);
-  }
-  list.setAttribute('role', 'list');
-  section.append(list); return section;
-}
-function renderSimple(data) {
+function renderAnalysis(data) {
   const fragment = document.createDocumentFragment();
-  fragment.append(renderPillarStrip(data));
-  const summary = make('div', 'simple-summary');
-  summary.append(make('span', '', '起运'), make('strong', '', `${data.offset.years}年${data.offset.months}个月${data.offset.days}天`));
-  fragment.append(summary, renderLuck(data)); return fragment;
+  const identity = make('div', 'analysis-identity');
+  identity.append(make('strong', '', data.name || '未命名案例'),
+    make('span', '', data.gender === 1 ? '男' : '女'),
+    make('span', '', `${data.inputSolar.toYmd()} ${String(data.inputSolar.getHour()).padStart(2, '0')}:${String(data.inputSolar.getMinute()).padStart(2, '0')}`));
+  fragment.append(identity);
+  const viewport = make('div', 'matrix-scroll analysis-chart');
+  viewport.setAttribute('role', 'region'); viewport.setAttribute('aria-label', '四柱及十神藏干');
+  const table = make('table', 'pillar-matrix traditional-matrix analysis-matrix');
+  const head = make('thead'); const headRow = make('tr');
+  headRow.append(make('th', 'row-label', '四柱'));
+  for (const pillar of data.pillars) headRow.append(make('th', 'pillar-heading', pillar.name));
+  head.append(headRow); table.append(head);
+  const body = make('tbody');
+  for (const [label, kind] of [['主星', 'god'], ['天干', 'stem'], ['地支', 'branch'], ['藏气', 'hidden']]) {
+    const row = make('tr', `chart-row row-${kind}`); row.append(make('th', 'row-label', label));
+    for (const pillar of data.pillars) row.append(renderChartCell(pillar, kind));
+    body.append(row);
+  }
+  table.append(body); viewport.append(table); fragment.append(viewport);
+  return fragment;
 }
 function renderMode(data, mode) {
-  if (mode !== 'traditional' && mode !== 'simple') mode = 'traditional';
+  if (mode !== 'traditional' && mode !== 'analysis') mode = 'traditional';
   activeMode = mode;
   modeOutput.replaceChildren();
   for (const tab of document.querySelectorAll('[data-mode]')) tab.setAttribute('aria-pressed', String(tab.dataset.mode === mode));
   const taiToggle = document.getElementById('taiyuan-toggle');
-  taiToggle.hidden = mode === 'simple';
+  taiToggle.hidden = mode === 'analysis';
   taiToggle.textContent = `胎元 ${showTaiYuan ? '开' : '关'}`;
   taiToggle.setAttribute('aria-pressed', String(showTaiYuan));
-  const titles = { traditional: '传统排盘', simple: '精简排盘' };
+  const titles = { traditional: '传统排盘', analysis: '案例分析' };
   document.getElementById('result-title').textContent = titles[mode];
+  document.getElementById('analysis-panel').hidden = mode !== 'analysis';
   if (mode === 'traditional') modeOutput.append(renderTraditional(data));
-  else modeOutput.append(renderSimple(data));
+  else modeOutput.append(renderAnalysis(data));
 }
 function render(data) {
   const solarTime = `${data.solar.toYmd()} ${String(data.solar.getHour()).padStart(2, '0')}:${String(data.solar.getMinute()).padStart(2, '0')}`;
@@ -924,6 +916,7 @@ function render(data) {
   selectedLuckIndex = selection.luckIndex;
   selectedYearIndex = selection.yearIndex;
   latestData = data; renderMode(data, activeMode); result.hidden = false;
+  if (activeMode === 'analysis') loadAnalysis(data);
   syncFavoriteButton(data);
   document.getElementById('chart-empty').hidden = true;
   document.getElementById('current-chart-hint').textContent = `${data.name || '未命名'} · ${solarTime}`;
@@ -962,90 +955,92 @@ async function syncFavoriteButton(data = latestData) {
     button.dataset.caseId = record?.id || '';
     button.textContent = record ? '★' : '☆';
     button.setAttribute('aria-pressed', String(Boolean(record)));
-    button.setAttribute('aria-label', record ? '已收藏，点击写笔记' : '收藏当前排盘');
-    button.title = record ? '已收藏，点击写笔记' : '收藏当前排盘';
+    button.setAttribute('aria-label', record ? '已收藏，点击查看分析' : '收藏当前排盘');
+    button.title = record ? '已收藏，点击查看分析' : '收藏当前排盘';
   } catch (_) { button.dataset.caseId = ''; button.textContent = '☆'; }
   finally { if (epoch === favoriteEpoch) button.disabled = false; }
 }
 
-function noteSummary(record) {
-  return `${record.display.name} · ${record.display.gender === 1 ? '男' : '女'} · ${record.display.solar}\n${record.display.pillars.join('　')}`;
+function analysisChanged() {
+  return Boolean(activeAnalysisCaseId && (document.getElementById('analysis-summary').value !== savedAnalysisSnapshot.summary
+    || document.getElementById('analysis-body').value !== savedAnalysisSnapshot.body));
 }
-async function openCaseNote(id) {
+async function loadAnalysis(data) {
+  if (!data) return;
+  const epoch = ++analysisLoadEpoch;
+  const status = document.getElementById('analysis-status');
+  const controls = ['analysis-summary', 'analysis-body', 'analysis-save', 'analysis-next'].map(id => document.getElementById(id));
+  controls.forEach(control => { control.disabled = true; });
   try {
-    const record = await CaseStore.get(id);
-    if (!record) throw new Error('案例不存在，请刷新列表后重试');
-    activeNoteCaseId = record.id;
-    savedNoteSnapshot = record.notes?.body || '';
-    document.getElementById('case-note-summary').textContent = noteSummary(record);
-    const body = document.getElementById('case-note-body'); body.value = savedNoteSnapshot;
-    document.getElementById('case-note-status').textContent = record.notes?.updatedAt
-      ? `上次保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}` : '新笔记会保存在此设备';
-    document.getElementById('case-note-sheet').showModal();
-    setTimeout(() => body.focus({ preventScroll: true }), 80);
-  } catch (exception) { showCaseSaveError(exception); }
+    clearTimeout(analysisSaveTimer); analysisSaveTimer = null;
+    status.textContent = analysisChanged() ? '正在保存上一盘…' : '正在读取分析…';
+    if (analysisChanged()) await saveOpenAnalysis();
+    if (epoch !== analysisLoadEpoch || latestData !== data || activeMode !== 'analysis') return;
+    status.textContent = '正在读取分析…';
+    const record = await CaseActions.findByInput(data.input) || await CaseActions.saveCalculated(data);
+    if (epoch !== analysisLoadEpoch || latestData !== data || activeMode !== 'analysis') return;
+    activeAnalysisCaseId = record.id;
+    savedAnalysisSnapshot = { summary: record.notes?.summary || '', body: record.notes?.body || '' };
+    document.getElementById('analysis-summary').value = savedAnalysisSnapshot.summary;
+    document.getElementById('analysis-body').value = savedAnalysisSnapshot.body;
+    status.textContent = record.notes?.updatedAt
+      ? `上次保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}` : '分析内容保存在此设备';
+    syncFavoriteButton(data);
+  } catch (exception) {
+    if (epoch === analysisLoadEpoch && latestData === data) {
+      activeMode = 'traditional'; renderMode(data, activeMode);
+      const feedback = document.getElementById('case-save-feedback');
+      feedback.textContent = `分析未打开：${exception.message || '请重试'}`; feedback.hidden = false;
+    }
+  } finally { if (epoch === analysisLoadEpoch) controls.forEach(control => { control.disabled = false; }); }
 }
-async function openCurrentNote() {
-  if (!latestData) return;
-  try {
-    const record = await CaseActions.findByInput(latestData.input) || await CaseActions.saveCalculated(latestData);
-    await openCaseNote(record.id);
-    syncFavoriteButton(latestData);
-  } catch (exception) { showCaseSaveError(exception); }
-}
-async function saveOpenNote() {
-  if (!activeNoteCaseId) throw new Error('请先选择案例');
-  clearTimeout(noteSaveTimer); noteSaveTimer = null;
-  const body = document.getElementById('case-note-body').value;
-  document.getElementById('case-note-status').textContent = '正在保存…';
-  const record = await CaseActions.saveNote(activeNoteCaseId, body);
-  savedNoteSnapshot = record.notes.body;
-  document.getElementById('case-note-status').textContent = `已保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}`;
+async function saveOpenAnalysis() {
+  if (!activeAnalysisCaseId) throw new Error('请先选择案例');
+  clearTimeout(analysisSaveTimer); analysisSaveTimer = null;
+  const id = activeAnalysisCaseId;
+  const values = { summary: document.getElementById('analysis-summary').value, body: document.getElementById('analysis-body').value };
+  const status = document.getElementById('analysis-status'); status.textContent = '正在保存…';
+  analysisSavePromise = analysisSavePromise.catch(() => {}).then(() => CaseActions.saveAnalysis(id, values));
+  const record = await analysisSavePromise;
+  if (activeAnalysisCaseId === id) {
+    savedAnalysisSnapshot = values;
+    status.textContent = analysisChanged() ? '正在编辑…' : `已保存：${new Date(record.notes.updatedAt).toLocaleString('zh-CN')}`;
+  }
   await refreshCases();
   return record;
-}
-async function closeCaseNote() {
-  if (document.getElementById('case-note-body').value !== savedNoteSnapshot) {
-    try { await saveOpenNote(); }
-    catch (exception) { document.getElementById('case-note-status').textContent = `保存失败：${exception.message || '请重试'}`; return; }
-  }
-  document.getElementById('case-note-sheet').close();
 }
 document.getElementById('case-favorite').addEventListener('click', async () => {
   if (!latestData) return;
   const button = document.getElementById('case-favorite'); button.disabled = true;
   try {
     const existing = await CaseActions.findByInput(latestData.input);
-    if (existing) { await openCaseNote(existing.id); return; }
+    if (existing) { activeMode = 'analysis'; renderMode(latestData, activeMode); await loadAnalysis(latestData); return; }
     const record = await CaseActions.saveCalculated(latestData);
     button.dataset.caseId = record.id; button.textContent = '★'; button.setAttribute('aria-pressed', 'true');
-    button.setAttribute('aria-label', '已收藏，点击写笔记'); button.title = '已收藏，点击写笔记';
+    button.setAttribute('aria-label', '已收藏，点击查看分析'); button.title = '已收藏，点击查看分析';
     const feedback = document.getElementById('case-save-feedback'); feedback.textContent = '已收藏到本机案例'; feedback.hidden = false;
   } catch (exception) { showCaseSaveError(exception); }
   finally { button.disabled = false; }
 });
-document.getElementById('case-note-open').addEventListener('click', openCurrentNote);
-document.getElementById('case-note-close').addEventListener('click', closeCaseNote);
-document.getElementById('case-note-sheet').addEventListener('cancel', event => { event.preventDefault(); closeCaseNote(); });
-document.getElementById('case-note-body').addEventListener('input', () => {
-  const status = document.getElementById('case-note-status'); status.textContent = '正在编辑…';
-  clearTimeout(noteSaveTimer);
-  noteSaveTimer = setTimeout(() => saveOpenNote().catch(exception => {
+for (const field of ['analysis-summary', 'analysis-body']) document.getElementById(field).addEventListener('input', () => {
+  const status = document.getElementById('analysis-status'); status.textContent = '正在编辑…';
+  clearTimeout(analysisSaveTimer);
+  analysisSaveTimer = setTimeout(() => saveOpenAnalysis().catch(exception => {
     status.textContent = `自动保存失败：${exception.message || '请手动保存'}`;
   }), 900);
 });
-document.getElementById('case-note-save').addEventListener('click', async () => {
-  try { await saveOpenNote(); } catch (exception) { document.getElementById('case-note-status').textContent = `保存失败：${exception.message || '请重试'}`; }
+document.getElementById('analysis-save').addEventListener('click', async () => {
+  try { await saveOpenAnalysis(); } catch (exception) { document.getElementById('analysis-status').textContent = `保存失败：${exception.message || '请重试'}`; }
 });
-document.getElementById('case-note-next').addEventListener('click', async () => {
+document.getElementById('analysis-next').addEventListener('click', async () => {
   try {
-    await saveOpenNote(); document.getElementById('case-note-sheet').close();
+    await saveOpenAnalysis();
     editingCaseId = null; document.getElementById('chart-submit').textContent = '开始排盘';
     document.getElementById('cancel-case-edit').hidden = true;
     document.getElementById('chart-name').value = '';
     showScreen('home');
     const yearInput = document.getElementById('year'); yearInput.focus({ preventScroll: true }); yearInput.select?.();
-  } catch (exception) { document.getElementById('case-note-status').textContent = `保存失败，暂未离开：${exception.message || '请重试'}`; }
+  } catch (exception) { document.getElementById('analysis-status').textContent = `保存失败，暂未离开：${exception.message || '请重试'}`; }
 });
 let caseDeleteMode = false;
 const selectedCaseIds = new Set();
@@ -1081,9 +1076,9 @@ async function refreshCases() {
       const edit = make('button', 'case-edit-icon'); edit.type = 'button'; edit.dataset.caseEdit = 'true';
       edit.setAttribute('aria-label', `编辑${item.display.name}`);
       edit.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6"/><path d="M13 3v6h6"/><path d="M8 13h3M8 17h2"/><path d="m14 16 5-5 2 2-5 5-3 1Z"/></svg>';
-      const note = make('button', `case-note-link${item.notes?.body ? ' has-note' : ''}`, item.notes?.body ? '有笔记' : '笔记');
-      note.type = 'button'; note.dataset.caseNote = 'true'; note.setAttribute('aria-label', `打开${item.display.name}的研究笔记`);
-      nameLine.append(edit, note);
+      const analysis = make('button', `case-analysis-link${item.notes?.body || item.notes?.summary ? ' has-analysis' : ''}`, '分析');
+      analysis.type = 'button'; analysis.dataset.caseAnalysis = 'true'; analysis.setAttribute('aria-label', `打开${item.display.name}的分析`);
+      nameLine.append(edit, analysis);
       details.append(nameLine, make('small', '', item.display.solar));
       const location = item.input.location || item.display.location;
       if (location) details.append(make('small', 'case-location', location));
@@ -1093,7 +1088,14 @@ async function refreshCases() {
         item.display.pillars.forEach(pillar => line.append(colored(pillar[part])));
         pillars.append(line);
       }
-      row.append(selector, details, pillars); list.append(row);
+      row.append(selector, details, pillars);
+      const synopsis = (item.notes?.summary || item.notes?.body || '').trim().replace(/\s+/g, ' ');
+      if (synopsis) {
+        const preview = make('small', 'case-summary', synopsis);
+        preview.title = synopsis;
+        row.append(preview);
+      }
+      list.append(row);
     }
     syncCaseDeleteControls();
     document.getElementById('cases-error').hidden = true;
@@ -1175,7 +1177,7 @@ document.getElementById('case-research-export').addEventListener('click', async 
     const payload = await CaseActions.exportResearch(records);
     const url = URL.createObjectURL(new Blob([payload], { type: 'application/json;charset=utf-8' }));
     const link = document.createElement('a'); link.href = url;
-    link.download = `八字研究资料-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `八字分析资料-${new Date().toISOString().slice(0, 10)}.json`;
     document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     document.getElementById('cases-error').hidden = true;
   } catch (exception) { showCaseSaveError(exception); }
@@ -1199,7 +1201,7 @@ caseBackupFile.addEventListener('change', async event => {
   caseRestoreSheet.showModal();
   try {
     const preview = await CaseActions.previewRestore(await file.text());
-    caseRestoreStatus.textContent = `共 ${preview.total} 条：新增 ${preview.added} 条，重复 ${preview.duplicate} 条，笔记冲突 ${preview.conflicts || 0} 条，错误 ${preview.error} 条`;
+    caseRestoreStatus.textContent = `共 ${preview.total} 条：新增 ${preview.added} 条，重复 ${preview.duplicate} 条，分析冲突 ${preview.conflicts || 0} 条，错误 ${preview.error} 条`;
     caseRestoreConfirm.disabled = preview.added === 0;
     const box = document.getElementById('case-restore-preview');
     for (const item of preview.details) {
@@ -1207,12 +1209,12 @@ caseBackupFile.addEventListener('change', async event => {
       row.append(make('strong', '', `${item.row}. ${item.label}`), make('span', '', item.message));
       if (item.status === 'conflict') {
         const label = make('label', 'case-restore-choice');
-        const choice = make('input'); choice.type = 'checkbox'; choice.setAttribute('aria-label', `用文件中的笔记覆盖${item.label}的本机笔记`);
+        const choice = make('input'); choice.type = 'checkbox'; choice.setAttribute('aria-label', `用文件中的分析覆盖${item.label}的本机分析`);
         choice.addEventListener('change', () => {
           const writes = CaseActions.selectRestoreUpdate(item.id, choice.checked);
           caseRestoreConfirm.disabled = writes === 0;
         });
-        label.append(choice, document.createTextNode('用文件笔记覆盖本机笔记')); row.append(label);
+        label.append(choice, document.createTextNode('用文件分析覆盖本机分析')); row.append(label);
       }
       box.append(row);
     }
@@ -1227,7 +1229,7 @@ caseRestoreConfirm.addEventListener('click', async () => {
     await refreshCases();
   } catch (exception) { caseRestoreStatus.textContent = exception.message || '恢复失败'; }
 });
-async function useSavedCase(id, edit = false) {
+async function useSavedCase(id, edit = false, analysis = false) {
   try {
     const record = await CaseStore.get(id); if (!record) return;
     const input = record.input;
@@ -1248,6 +1250,7 @@ async function useSavedCase(id, edit = false) {
       document.getElementById('chart-name').focus({ preventScroll: true });
       return;
     }
+    activeMode = analysis ? 'analysis' : 'traditional';
     openingSavedCase = true; render(calculate());
   } catch (error) { showCaseSaveError(error); }
   finally { openingSavedCase = false; }
@@ -1262,7 +1265,7 @@ document.getElementById('cases-list').addEventListener('click', event => {
     syncCaseDeleteControls(); return;
   }
   if (event.target.closest('[data-case-edit]')) { useSavedCase(row.dataset.caseId, true); return; }
-  if (event.target.closest('[data-case-note]')) { openCaseNote(row.dataset.caseId); return; }
+  if (event.target.closest('[data-case-analysis]')) { useSavedCase(row.dataset.caseId, false, true); return; }
   useSavedCase(row.dataset.caseId);
 });
 document.getElementById('cases-list').addEventListener('keydown', event => {
